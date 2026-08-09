@@ -1,0 +1,32 @@
+server:
+  port: 8001
+
+spring:
+  application:
+    name: provider-service
+  datasource:
+    url: jdbc:sqlserver://192.168.0.66:1543;databaseName=RDS_BC;encrypt=false;trustServerCertificate=true
+    username: mis_user
+    password: Enjoyit.2SqlServer
+    driver-class-name: com.microsoft.sqlserver.jdbc.SQLServerDriver
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 1
+      connection-timeout: 30000
+  # RDS_SC 数据源（盘点报表专用）
+  datasource-sc:
+    url: jdbc:sqlserver://192.168.0.66:1543;databaseName=RDS_SC;encrypt=false;trustServerCertificate=true
+    username: mis_user
+    password: Enjoyit.2SqlServer
+    driver-class-name: com.microsoft.sqlserver.jdbc.SQLServerDriver
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 1
+      connection-timeout: 30000
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+  instance:
+    prefer-ip-address: true

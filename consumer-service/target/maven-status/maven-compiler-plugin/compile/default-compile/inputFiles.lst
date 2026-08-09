@@ -1,0 +1,10 @@
+C:\work\springcloud-demo\consumer-service\src\main\java\com\demo\consumer\feign\UserFeignClient.java
+C:\work\springcloud-demo\consumer-service\src\main\java\com\demo\consumer\vo\GoodsVO.java
+C:\work\springcloud-demo\consumer-service\src\main\java\com\demo\consumer\ConsumerApplication.java
+C:\work\springcloud-demo\consumer-service\src\main\java\com\demo\consumer\controller\UserConsumerController.java
+C:\work\springcloud-demo\consumer-service\src\main\java\com\demo\consumer\external\controller\DemoExternalConsumerController.java
+C:\work\springcloud-demo\consumer-service\src\main\java\com\demo\consumer\utils\ApiResult.java
+C:\work\springcloud-demo\consumer-service\src\main\java\com\demo\consumer\vo\GoodsCcodeVO.java
+C:\work\springcloud-demo\consumer-service\src\main\java\com\demo\consumer\dto\GoodsQueryDTO.java
+C:\work\springcloud-demo\consumer-service\src\main\java\com\demo\consumer\external\vo\DemoGoodsVO.java
+C:\work\springcloud-demo\consumer-service\src\main\java\com\demo\consumer\external\feign\DemoExternalFeignClient.java
