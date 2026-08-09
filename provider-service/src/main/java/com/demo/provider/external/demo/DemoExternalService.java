@@ -97,7 +97,7 @@ public class DemoExternalService {
 
         return Collections.singletonList(item);
 
-        // ============ 真实调用代码（对接外部系统时启用） ============
+        // ============ 真实调用代码（对接外部系统时启用） ===========
         // ① 构建业务 DTO
         // DemoQueryReq bizReq = DemoQueryReq.builder()
         //         .goodsCode(goodsCode)
