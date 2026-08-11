@@ -11,7 +11,7 @@ import java.math.BigDecimal;
  * 商品主档实体 — 映射 dbo.tbi_imp_gds
  */
 @Data
-@TableName("[dbo].[tbi_imp_gds]")
+@TableName("tbi_imp_gds")
 public class Goods {
 
     /** 商品编码 */

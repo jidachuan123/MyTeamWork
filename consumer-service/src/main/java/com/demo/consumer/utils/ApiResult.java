@@ -24,4 +24,23 @@ public class ApiResult<T> implements Serializable {
     private long count;
     private long total;
     private String traceId;
+
+    public static <T> ApiResult<T> ok(T data) {
+        ApiResult<T> r = new ApiResult<>();
+        r.code = 0;
+        r.result = data;
+        r.msg = "操作成功";
+        return r;
+    }
+
+    public static <T> ApiResult<T> failed(String msg) {
+        ApiResult<T> r = new ApiResult<>();
+        r.code = 1;
+        r.msg = msg;
+        return r;
+    }
+
+    public boolean isSuccess() {
+        return code == 0;
+    }
 }

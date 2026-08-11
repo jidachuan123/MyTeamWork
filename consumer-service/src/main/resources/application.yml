@@ -11,3 +11,12 @@ eureka:
       defaultZone: http://localhost:8761/eureka/
   instance:
     prefer-ip-address: true
+
+# JWT 配置
+jwt:
+  secret: demo-springcloud-secret-key-2026
+  expire: 86400000  # 24小时(毫秒)
+
+# 关闭 Shiro starter 自动配置，使用自定义 ShiroConfig
+shiro:
+  enabled: false
