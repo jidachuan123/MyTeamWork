@@ -57,7 +57,7 @@ public class SalesDetailController {
             @RequestParam(defaultValue = "2026-08-10") String endDate,
             @RequestParam(defaultValue = "2025-08-01") String cmpStartDate,
             @RequestParam(defaultValue = "2025-08-10") String cmpEndDate,
-            @RequestParam(defaultValue = "是") String showStore,
+            @RequestParam(defaultValue = "显示门店") String showStore,
             @RequestParam(defaultValue = "3") String deptLevels,
             @RequestParam(defaultValue = "") String catLevels,
             @RequestParam(defaultValue = "不显示品牌") String showBrand,
