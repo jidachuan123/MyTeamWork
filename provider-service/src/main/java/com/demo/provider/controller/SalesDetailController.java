@@ -37,7 +37,7 @@ public class SalesDetailController {
      * @param deptLevels      部门显示层级（逗号分隔，如 "3"），默认 3
      * @param catLevels       品类显示层级，默认空
      * @param showBrand       是否显示品牌，默认 不显示品牌
-     * @param orgCode         机构编码，默认 1101001
+     * @param orgCode         机构编码，默认空（空=全部机构）
      * @param department      部门，默认空
      * @param category        品类，默认空
      * @param brand           品牌，默认空
@@ -58,10 +58,10 @@ public class SalesDetailController {
             @RequestParam(defaultValue = "2026-08-11") String cmpStartDate,
             @RequestParam(defaultValue = "2026-08-11") String cmpEndDate,
             @RequestParam(defaultValue = "显示门店") String showStore,
-            @RequestParam(defaultValue = "3") String deptLevels,
+            @RequestParam(defaultValue = "") String deptLevels,
             @RequestParam(defaultValue = "") String catLevels,
             @RequestParam(defaultValue = "不显示品牌") String showBrand,
-            @RequestParam(defaultValue = "1101001") String orgCode,
+            @RequestParam(defaultValue = "") String orgCode,
             @RequestParam(defaultValue = "") String department,
             @RequestParam(defaultValue = "") String category,
             @RequestParam(defaultValue = "") String brand,
