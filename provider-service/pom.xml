@@ -55,5 +55,11 @@
             <artifactId>shiro-core</artifactId>
             <version>1.10.1</version>
         </dependency>
+
+        <!-- JavaMail (销售日报定时邮件) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-mail</artifactId>
+        </dependency>
     </dependencies>
 </project>

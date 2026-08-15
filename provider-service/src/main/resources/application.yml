@@ -4,6 +4,21 @@ server:
 spring:
   application:
     name: provider-service
+  mail:
+    host: smtp.qq.com
+    port: 465
+    username: 591111450@qq.com
+    password: ${MAIL_AUTH_CODE:}
+    default-encoding: UTF-8
+    properties:
+      mail:
+        smtp:
+          auth: true
+          ssl:
+            enable: true
+          socketFactory:
+            class: javax.net.ssl.SSLSocketFactory
+          socketFactory.port: 465
   datasource:
     url: jdbc:sqlserver://192.168.0.66:1543;databaseName=RDS_BC;encrypt=false;trustServerCertificate=true
     username: mis_user
@@ -30,3 +45,13 @@ eureka:
       defaultZone: http://localhost:8761/eureka/
   instance:
     prefer-ip-address: true
+
+# ===== 销售详情日报（每天早晨 10:00 定时任务）=====
+report:
+  daily:
+    cron: "0 0 10 * * ?"          # 每天早上 10:00 触发
+    org-code: "1101001"           # 机构编码（与前端页面默认值一致）
+    mail-to: "591111450@qq.com"   # 收件人
+    mail-from: "591111450@qq.com" # 发件人（需与 spring.mail.username 一致）
+    chrome-path: ""               # 留空则自动探测 Chrome/Edge 路径
+    output-dir: "C:/work/MyTeamWork/provider-service/target/report"  # HTML/截图输出目录（绝对路径，避免受启动目录影响）
