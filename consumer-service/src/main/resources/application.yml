@@ -13,9 +13,38 @@ eureka:
     prefer-ip-address: true
 
 # JWT 配置
+# secret 为 48 字节随机密钥（96 位十六进制），同时用于：
+#   1. 门户登录 JWT 签名
+#   2. SSO ticket 签名（方式A：共享密钥，已安全分发给子系统 her-subsystem）
+# 子系统 HerTeamWork 的 sso.portal-secret 必须与此值完全一致
 jwt:
-  secret: demo-springcloud-secret-key-2026
+  secret: "cdf102f540eeb3255890252f383417f1fba3e1e7db6a403424921723f5dd684fc2b130e1035c26b20a841408efb3eee7"
   expire: 86400000  # 24小时(毫秒)
+
+# 门户子系统登记表（createSsoTicket 按 code 查找并签发 targetApp）
+portal:
+  subsystems:
+    - code: A                       # 真实对接的第三方子系统（HerTeamWork/her-subsystem，端口 8003）
+      name: 子系统A
+      desc: HerTeamWork 业务系统A（真实 SSO 对接）
+      remark: 共享密钥方式，ticket 带 targetApp=A
+      color: "#409EFF"
+      icon: DataAnalysis
+      url: "http://192.168.199.202:8003/"     # 跳转地址（使用本机局域网 IP）
+    - code: B                       # 模拟子系统（前端路由模拟，未真实对接）
+      name: 子系统B
+      desc: 商品管理系统（模拟）
+      remark: 模拟子系统B的独立页面
+      color: "#67C23A"
+      icon: Goods
+      path: /sub/b
+    - code: C                       # 模拟子系统（前端路由模拟，未真实对接）
+      name: 子系统C
+      desc: 外部对接系统（模拟）
+      remark: 模拟子系统C的独立页面
+      color: "#E6A23C"
+      icon: Connection
+      path: /sub/c
 
 # 关闭 Shiro starter 自动配置，使用自定义 ShiroConfig
 shiro:
