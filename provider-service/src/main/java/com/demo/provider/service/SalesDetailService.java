@@ -747,7 +747,8 @@ public class SalesDetailService {
         sb.append("       ROUND((A.C_PROFIT - A.C_PAY_FREE)/IIF((A.C_SALE_REVENUE - A.C_PAY_FREE)=0,NULL,A.C_SALE_REVENUE - A.C_PAY_FREE),4)*100 -\n");
         sb.append("       ROUND((A.C_PROFIT_DQ - A.C_PAY_FREE_DQ)/IIF((A.C_SALE_REVENUE_DQ - A.C_PAY_FREE_DQ)=0,NULL,A.C_SALE_REVENUE_DQ - A.C_PAY_FREE_DQ),4)*100 AS 净毛利率对比增长,\n");
         sb.append("        A.C_SALE_REVENUE_PM AS 销售额排名,\n");
-        sb.append("        A.C_PROFIT_PM AS 毛利额排名\n");
+        sb.append("        A.C_PROFIT_PM AS 毛利额排名,\n");
+        sb.append("mykucun.hanshuichengbenjine as 当日库存金额");
         sb.append("   FROM #TEMP_REP_SALE_PRO A\n");
         sb.append("   LEFT JOIN TB_MD_BRAND (NOLOCK) PP ON ISNULL(A.C_GDS_BCODE,'') = PP.C_BCODE AND C_TENANT_ID = @tenantid\n");
         sb.append("   LEFT JOIN #TEMP_REP_TRADE B ON ISNULL(A.C_STORE_ID,'') = ISNULL(B.C_STORE_ID,'')\n");
@@ -771,6 +772,24 @@ public class SalesDetailService {
         sb.append("                              AND ISNULL(A.C_CATID7,'') = ISNULL(B.C_CCODE7,'')\n");
         sb.append("                              AND ISNULL(A.C_CATID8,'') = ISNULL(B.C_CCODE8,'')\n");
         sb.append("                              AND ISNULL(A.C_GDS_BCODE,'') = ISNULL(B.C_BCODE,'')\n");
+
+        sb.append("              LEFT JOIN\n" +
+                "                (\n" +
+                "                SELECT   \n" +
+                "                    sto.c_store_id AS jigoubianma,\n" +
+                "                    sum(sto.c_at_cost) as hanshuichengbenjine\n" +
+                "                  FROM\n" +
+                "                    tb_wb_gdsstock sto ( NOLOCK ) \n" +
+                "                  WHERE\n" +
+                "                       sto.c_store_id not in ('1101951','1103951','1501001','1501031','1101099') \n" +
+                "                       and  sto.c_store_id not like '1106%' \n" +
+                "                       and sto.c_store_id not like '1108%'\n" +
+                "                       and sto.c_store_id not like '13%'\n" +
+                "                    group by sto.c_store_id\n" +
+                "                  \n" +
+                "                ) as mykucun\n" +
+                "                on  A.C_STORE_ID = mykucun.jigoubianma\n");
+
         sb.append("ORDER BY A.C_FSDATE,\n");
         sb.append("        A.C_STORE_ID,\n");
         sb.append("        A.C_DEPTID1,\n");
