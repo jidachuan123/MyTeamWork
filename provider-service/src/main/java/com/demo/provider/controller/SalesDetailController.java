@@ -1,5 +1,6 @@
 package com.demo.provider.controller;
 
+import com.demo.provider.report.SalesDailyReportScheduler;
 import com.demo.provider.service.SalesDetailService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -21,6 +22,9 @@ public class SalesDetailController {
 
     @Autowired
     private SalesDetailService salesDetailService;
+
+    @Autowired
+    private SalesDailyReportScheduler salesDailyReportScheduler;
 
     /**
      * 销售详情查询
@@ -77,5 +81,15 @@ public class SalesDetailController {
                 showStore, deptLevels, catLevels, showBrand,
                 orgCode, department, category, brand, channel,
                 comparableStore, showPlan, showDate);
+    }
+
+    /**
+     * 手动触发销售日报定时任务（测试用）
+     * 生成 SalesDetail + SalesDetail2 两张截图并发邮件
+     */
+    @GetMapping("/trigger-daily-report")
+    public String triggerDailyReport() {
+        new Thread(() -> salesDailyReportScheduler.runDailyReport()).start();
+        return "日报任务已触发，请查看日志和邮箱";
     }
 }

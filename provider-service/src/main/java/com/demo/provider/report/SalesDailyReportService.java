@@ -31,8 +31,8 @@ import java.util.concurrent.TimeUnit;
  * 销售详情日报服务
  *
  * 每天早晨定时取「部门销售详情」数据（逻辑与前端 SalesDetail.vue 完全一致：
- * 明细 deptLevels=3 + 部门合计 deptLevels=2 + 超市总计 deptLevels=1，环比/同比各查一遍），
- * 组装成 HTML 报表 → 用本机 Chrome/Edge headless 截图 PNG → SMTP 发送邮件。
+ * 明细 deptLevels=3 + 部门合计 deptLevels=2 + 超市总计 deptLevels 不传，环比/同比各查一遍），
+ * 组装成 HTML 报表 → 用本机 Chrome/Edge headless 截图 PNG。邮件由调度器统一发送。
  */
 @Service
 public class SalesDailyReportService {
@@ -76,14 +76,15 @@ public class SalesDailyReportService {
     private static final String SHOW_BRAND = "不显示品牌";
 
     /**
-     * 生成某天的销售日报：取数 → HTML → 截图 → 发邮件
+     * 生成某天的销售日报（SalesDetail 页面）：取数 → HTML → 截图
+     * 邮件发送由调度器统一处理（两个报表一起发）。
      *
-     * 入参日期规则（date 为发送日，例如 8.14 发送）：
-     *   - 查询日期（开始/结束）    = 前一天（8.13）
-     *   - 环比对比日期（开始/结束）= 前天的前一天（8.12）
-     *   - 同比对比日期（开始/结束）= 查询日期的去年同日（2025-08-13）
+     * 入参日期规则（date 为发送日）：
+     *   - 查询日期（开始/结束）    = 前一天
+     *   - 环比对比日期（开始/结束）= 前两天
+     *   - 同比对比日期（开始/结束）= 去年的今天
      *
-     * @return 执行结果摘要（供日志/手动测试接口展示）
+     * @return 截图 PNG 路径（失败返回 null）
      */
     public String generateDailyReport(LocalDate date) {
         // 发送日（用于文件名/邮件主题）
@@ -91,7 +92,7 @@ public class SalesDailyReportService {
         // 入参日期：查询=前一天，环比对比=前天，同比对比=去年同日
         LocalDate queryDate = date.minusDays(1);
         LocalDate momDate   = date.minusDays(2);
-        LocalDate yoyDate   = queryDate.minusYears(1);
+        LocalDate yoyDate   = date.minusYears(1);
         String q = queryDate.format(DTF);   // 查询日期（开始=结束=前一天）
         String m = momDate.format(DTF);     // 环比对比日期（前天）
         String y = yoyDate.format(DTF);     // 同比对比日期（去年同日）
@@ -102,9 +103,9 @@ public class SalesDailyReportService {
         List<Map<String, Object>> detail    = query(q, q, m, m, "3");
         List<Map<String, Object>> detailYoY = query(q, q, y, y, "3");
         List<Map<String, Object>> lv2       = query(q, q, m, m, "2");
-        List<Map<String, Object>> lv1       = query(q, q, m, m, "1");
+        List<Map<String, Object>> lv1       = query(q, q, m, m, "");
         List<Map<String, Object>> lv2YoY    = query(q, q, y, y, "2");
-        List<Map<String, Object>> lv1YoY    = query(q, q, y, y, "1");
+        List<Map<String, Object>> lv1YoY    = query(q, q, y, y, "");
 
         // ===== 2. 组装表格行（与前端 tableData 一致）=====
         List<Row> rows = buildRows(detail, detailYoY, lv2, lv1, lv2YoY, lv1YoY);
@@ -130,16 +131,9 @@ public class SalesDailyReportService {
         String pngPath = outputDir + "/sales-detail-" + today + ".png";
         boolean shotOk = screenshot(htmlPath, pngPath, rows.size());
 
-        // ===== 5. 发邮件 =====
-        StringBuilder sb = new StringBuilder();
-        sb.append("报表生成完成，共 ").append(rows.size()).append(" 行数据（含小计/总计）。\n");
-        if (shotOk) {
-            sb.append("截图已生成: ").append(pngPath).append("\n");
-            sb.append(sendMail(today, pngPath));
-        } else {
-            sb.append("截图失败：未找到可用的 Chrome/Edge（可在 application.yml 配置 report.daily.chrome-path）。\n");
-        }
-        return sb.toString();
+        log.info("[销售日报] 报表生成完成，共 {} 行数据，截图: {} ({})",
+                rows.size(), pngPath, shotOk ? "成功" : "失败");
+        return shotOk ? pngPath : null;
     }
 
     // ==================== 查询 ====================
@@ -562,7 +556,7 @@ public class SalesDailyReportService {
 
     // ==================== 截图 ====================
 
-    private boolean screenshot(String htmlPath, String pngPath, int rowCount) {
+    boolean screenshot(String htmlPath, String pngPath, int rowCount) {
         String browser = resolveBrowser();
         if (browser == null) {
             return false;
@@ -703,7 +697,7 @@ public class SalesDailyReportService {
 
     // ==================== 邮件发送 ====================
 
-    private String sendMail(String today, String pngPath) {
+    public String sendMail(String today, List<String> pngPaths) {
         if (mailTo == null || mailTo.trim().isEmpty()) {
             return "未配置收件人（report.daily.mail-to），跳过邮件发送。\n";
         }
@@ -716,16 +710,21 @@ public class SalesDailyReportService {
             helper.setFrom(mailFrom);
             helper.setTo(mailTo);
             helper.setSubject("销售详情日报 " + today);
-            helper.setText("附件为 " + today + " 的部门销售详情报表截图，请查收。", false);
-            helper.addAttachment("销售详情_" + today + ".png", new File(pngPath));
+            helper.setText("附件为 " + today + " 的销售详情报表截图（销售详情1 + 销售详情2），请查收。", false);
+            for (String pngPath : pngPaths) {
+                File f = new File(pngPath);
+                if (f.exists()) {
+                    helper.addAttachment(f.getName(), f);
+                }
+            }
             mailSender.send(msg);
-            return "邮件已发送至 " + mailTo + "。\n";
+            return "邮件已发送至 " + mailTo + "，附件 " + pngPaths.size() + " 张。\n";
         } catch (Exception e) {
             return "邮件发送失败: " + e.getMessage() + "\n";
         }
     }
 
-    private void ensureOutputDir() throws Exception {
+    void ensureOutputDir() throws Exception {
         File dir = new File(outputDir);
         if (!dir.exists() && !dir.mkdirs()) {
             throw new IllegalStateException("无法创建目录: " + dir.getAbsolutePath());
