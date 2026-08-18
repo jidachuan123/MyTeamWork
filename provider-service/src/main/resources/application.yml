@@ -56,3 +56,8 @@ report:
     mail-from: "591111450@qq.com" # 发件人（需与 spring.mail.username 一致）
     chrome-path: ""               # 留空则自动探测 Chrome/Edge 路径
     output-dir: "C:/work/MyTeamWork/provider-service/target/report"  # HTML/截图输出目录
+  # ===== 销售报表1 预计算（每天凌晨 2:00 定时跑批，结果存 dw.rpt_sale_detail_precompute）=====
+  precompute:
+    cron: "0 0 2 * * ?"           # 每天凌晨 2:00 触发
+    org-code: "1101001,1101031"           # 机构编码，支持多个用英文逗号分隔（如 "1101001,1102"），定时任务逐个跑批
+    report-type: "SALE_DETAIL_1"  # 报表类型标识
