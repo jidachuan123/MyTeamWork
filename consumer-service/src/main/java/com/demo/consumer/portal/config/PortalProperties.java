@@ -45,6 +45,9 @@ public class PortalProperties {
         /** 前端路由路径（仅模拟跳转用，真实子系统无需配置） */
         private String path;
 
+        /** 真实跳转时是否携带 SSO ticket（默认 true；对纯外链、不做 SSO 对接的系统设 false） */
+        private boolean withTicket = true;
+
         public boolean isRealRedirect() {
             return url != null && !url.trim().isEmpty();
         }

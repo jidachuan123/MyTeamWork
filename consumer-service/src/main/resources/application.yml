@@ -31,13 +31,14 @@ portal:
       color: "#409EFF"
       icon: DataAnalysis
       url: "http://192.168.199.202:8003/"     # 跳转地址（使用本机局域网 IP）
-    - code: B                       # 模拟子系统（前端路由模拟，未真实对接）
-      name: 子系统B
-      desc: 商品管理系统（模拟）
-      remark: 模拟子系统B的独立页面
+    - code: 佳和                     # 外部对接系统（纯跳转，不携带 SSO ticket）
+      name: 山东佳和商业信息管理系统
+      desc: 商业信息管理系统（外部对接，纯跳转）
+      remark: 外部系统，点卡片直接跳转，不携带票据
       color: "#67C23A"
       icon: Goods
-      path: /sub/b
+      url: "http://192.168.0.54:9006/#/"
+      with-ticket: false
     - code: C                       # 模拟子系统（前端路由模拟，未真实对接）
       name: 子系统C
       desc: 外部对接系统（模拟）

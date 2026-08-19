@@ -107,7 +107,12 @@ public class PortalController {
                 // 真实子系统：返回完整跳转地址，前端 window.location.href 跳出本站
                 String sep = sub.getUrl().contains("?") ? "&" : "?";
                 data.put("mode", "redirect");
-                data.put("redirectUrl", sub.getUrl() + sep + "ticket=" + URLEncoder.encode(ticket, "UTF-8"));
+                if (sub.isWithTicket()) {
+                    data.put("redirectUrl", sub.getUrl() + sep + "ticket=" + URLEncoder.encode(ticket, "UTF-8"));
+                } else {
+                    // 纯外链跳转：子系统自带的登录页，门户不附带 SSO 票据
+                    data.put("redirectUrl", sub.getUrl());
+                }
             } else {
                 // 模拟子系统：返回前端路由，前端 router.push
                 data.put("mode", "mock");
