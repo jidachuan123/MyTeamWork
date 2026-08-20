@@ -210,6 +210,7 @@ public class SalesDetail2ReportService {
         s.isSubtotal = true;
         s.orgName = groupName + " 合计";
         for (StoreRow r : rows) {
+            if ("1102911".equals(r.orgCode)) continue;  // 巨野便利店配送中心为配送中心，不当门店，整行不进门店合计
             s.sales += r.sales;
             s.profit += r.profit;
             s.customers += r.customers;
