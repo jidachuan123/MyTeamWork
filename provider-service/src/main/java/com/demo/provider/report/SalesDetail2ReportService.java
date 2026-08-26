@@ -57,25 +57,54 @@ public class SalesDetail2ReportService {
     /**
      * 生成某天的销售详情2 报表：取数 → HTML → 截图
      *
+     * 定时任务：机构编码取配置 report.daily.org-code2（默认 1101,1102,1191001），
+     * 日期由 date 推算（本期=前一天、环比=前两天、同比=去年今天），部门层级/部门编码留空走后端默认口径。
+     *
      * @return 截图 PNG 路径（失败返回 null）
      */
     public String generateDailyReport(LocalDate date) {
-        String today = date.format(DTF);
-        LocalDate queryDate = date.minusDays(1);    // 本期 = 前一天
-        LocalDate momDate   = date.minusDays(2);    // 环比 = 前两天
-        LocalDate yoyDate   = date.minusYears(1);   // 同比 = 去年的今天
-        String q = queryDate.format(DTF);
-        String m = momDate.format(DTF);
-        String y = yoyDate.format(DTF);
+        DailyReportParam req = new DailyReportParam();
+        req.setOrgCode(orgCode2);
+        req.setDeptLevels("");
+        req.setDepartment("");
+        req.setStartDate(date.minusDays(1).format(DTF));
+        req.setEndDate(date.minusDays(1).format(DTF));
+        req.setCmpStartDate(date.minusDays(2).format(DTF));
+        req.setCmpEndDate(date.minusDays(2).format(DTF));
+        req.setYoyStartDate(date.minusYears(1).format(DTF));
+        req.setYoyEndDate(date.minusYears(1).format(DTF));
+        return generateDailyReport(req);
+    }
 
-        log.info("[销售详情2] 开始生成 {} 报表（查询 {} / 环比 {} / 同比 {}），orgCode={}",
-                today, q, m, y, orgCode2);
+    /**
+     * 按页面查询参数生成销售详情2 截图（手动触发用）。
+     * 日期 / 机构编码 / 部门层级 / 部门编码全部来自前端传入的 queryForm，不再写死。
+     *
+     * @return 截图 PNG 路径（失败返回 null）
+     */
+    public String generateDailyReport(DailyReportParam req) {
+        // 报表日期标签：取「本期结束日期」；为空时回退今天
+        String today = (req.getEndDate() != null && !req.getEndDate().trim().isEmpty())
+                ? req.getEndDate().trim() : LocalDate.now().format(DTF);
+        String org = (req.getOrgCode() != null && !req.getOrgCode().trim().isEmpty())
+                ? req.getOrgCode().trim() : orgCode2;
+        String dept = (req.getDepartment() != null) ? req.getDepartment().trim() : "";
+        String deptLevels = (req.getDeptLevels() != null) ? req.getDeptLevels().trim() : "";
+        String q   = (req.getStartDate() != null) ? req.getStartDate().trim() : "";
+        String end = (req.getEndDate()    != null) ? req.getEndDate().trim()    : "";
+        String m   = (req.getCmpStartDate() != null) ? req.getCmpStartDate().trim() : "";
+        String mEnd = (req.getCmpEndDate()  != null) ? req.getCmpEndDate().trim()  : "";
+        String y   = (req.getYoyStartDate() != null) ? req.getYoyStartDate().trim() : "";
+        String yEnd = (req.getYoyEndDate()  != null) ? req.getYoyEndDate().trim()  : "";
+
+        log.info("[销售详情2] 开始生成 {} 报表（查询 {}/{} / 环比 {}/{} / 同比 {}/{}），orgCode={}, deptLevels={}, department={}",
+                today, q, end, m, mEnd, y, yEnd, org, deptLevels, dept);
 
         // ===== 1. 取数（2 次查询）=====
         // 环比调用：对比日期 = 环比日期；本期值 + 环比对期值 从此结果取
-        List<Map<String, Object>> momData = query(q, q, m, m);
+        List<Map<String, Object>> momData = query(q, end, m, mEnd, org, deptLevels, dept);
         // 同比调用：对比日期 = 同比日期；同比对期值从此结果取
-        List<Map<String, Object>> yoyData = query(q, q, y, y);
+        List<Map<String, Object>> yoyData = query(q, end, y, yEnd, org, deptLevels, dept);
 
         // ===== 2. 组装表格行 =====
         List<StoreRow> rows = buildRows(momData, yoyData);
@@ -107,14 +136,15 @@ public class SalesDetail2ReportService {
     // ==================== 查询 ====================
 
     private List<Map<String, Object>> query(String startDate, String endDate,
-                                            String cmpStartDate, String cmpEndDate) {
-        // deptLevels="" 不传（后端走默认口径）、department="" 不传
+                                            String cmpStartDate, String cmpEndDate,
+                                            String orgCode, String deptLevels, String department) {
+        // deptLevels/department 留空时后端走默认口径（与页面一致）
         return salesDetailService.getSalesDetail(
                 TENANT_ID, LANG, USER_NO,
                 DATE_TYPE, startDate, endDate,
                 cmpStartDate, cmpEndDate,
-                SHOW_STORE, "", "", SHOW_BRAND,
-                orgCode2, "", "", "", "",
+                SHOW_STORE, deptLevels, "", SHOW_BRAND,
+                orgCode, department, "", "", "",
                 "0", "否", "显示日期");
     }
 

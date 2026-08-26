@@ -83,35 +83,60 @@ public class SalesDailyReportService {
      *   - 查询日期（开始/结束）    = 前一天
      *   - 环比对比日期（开始/结束）= 前两天
      *   - 同比对比日期（开始/结束）= 去年的今天
+     * 机构编码取配置 report.daily.org-code（默认 1101001），部门层级固定 3。
      *
      * @return 截图 PNG 路径（失败返回 null）
      */
     public String generateDailyReport(LocalDate date) {
-        // 发送日（用于文件名/邮件主题）
-        String today = date.format(DTF);
-        // 入参日期：查询=前一天，环比对比=前天，同比对比=去年同日
-        LocalDate queryDate = date.minusDays(1);
-        LocalDate momDate   = date.minusDays(2);
-        LocalDate yoyDate   = date.minusYears(1);
-        String q = queryDate.format(DTF);   // 查询日期（开始=结束=前一天）
-        String m = momDate.format(DTF);     // 环比对比日期（前天）
-        String y = yoyDate.format(DTF);     // 同比对比日期（去年同日）
+        // 定时任务：用配置 orgCode + 由 date 推算的日期，委托给参数版
+        DailyReportParam req = new DailyReportParam();
+        req.setOrgCode(orgCode);
+        req.setDeptLevels("3");
+        req.setStartDate(date.minusDays(1).format(DTF));
+        req.setEndDate(date.minusDays(1).format(DTF));
+        req.setCmpStartDate(date.minusDays(2).format(DTF));
+        req.setCmpEndDate(date.minusDays(2).format(DTF));
+        req.setYoyStartDate(date.minusYears(1).format(DTF));
+        req.setYoyEndDate(date.minusYears(1).format(DTF));
+        return generateDailyReport(req);
+    }
+
+    /**
+     * 按页面查询参数生成销售日报截图（手动触发用）。
+     * 日期 / 机构编码 / 部门层级全部来自前端传入的 queryForm，不再写死。
+     *
+     * @return 截图 PNG 路径（失败返回 null）
+     */
+    public String generateDailyReport(DailyReportParam req) {
+        // 报表日期标签：取「本期结束日期」（与页面本期一致）；为空时回退今天
+        String today = (req.getEndDate() != null && !req.getEndDate().trim().isEmpty())
+                ? req.getEndDate().trim()
+                : LocalDate.now().format(DTF);
+        String org = (req.getOrgCode() != null && !req.getOrgCode().trim().isEmpty())
+                ? req.getOrgCode().trim() : orgCode;
+        String detailLevel = (req.getDeptLevels() != null && !req.getDeptLevels().trim().isEmpty())
+                ? req.getDeptLevels().trim() : "3";
+        String q = nvl(req.getStartDate());
+        String end = nvl(req.getEndDate());
+        String m = nvl(req.getCmpStartDate());
+        String mEnd = nvl(req.getCmpEndDate());
+        String y = nvl(req.getYoyStartDate());
+        String yEnd = nvl(req.getYoyEndDate());
 
         // ===== 1. 取数（6 次查询，与前端页面一致）=====
-        // 前 3 次：对比日期=前天 → 环比增长率
-        // 后 3 次：对比日期=去年同日 → 同比增长率
-        List<Map<String, Object>> detail    = query(q, q, m, m, "3");
-        List<Map<String, Object>> detailYoY = query(q, q, y, y, "3");
-        List<Map<String, Object>> lv2       = query(q, q, m, m, "2");
-        List<Map<String, Object>> lv1       = query(q, q, m, m, "");
-        List<Map<String, Object>> lv2YoY    = query(q, q, y, y, "2");
-        List<Map<String, Object>> lv1YoY    = query(q, q, y, y, "");
+        // 前 3 次：对比日期=环比 → 环比增长率；后 3 次：对比日期=同比 → 同比增长率
+        List<Map<String, Object>> detail    = query(q, end, m, mEnd, detailLevel, org);
+        List<Map<String, Object>> detailYoY = query(q, end, y, yEnd, detailLevel, org);
+        List<Map<String, Object>> lv2       = query(q, end, m, mEnd, "2", org);
+        List<Map<String, Object>> lv1       = query(q, end, m, mEnd, "", org);
+        List<Map<String, Object>> lv2YoY    = query(q, end, y, yEnd, "2", org);
+        List<Map<String, Object>> lv1YoY    = query(q, end, y, yEnd, "", org);
 
         // ===== 2. 组装表格行（与前端 tableData 一致）=====
         List<Row> rows = buildRows(detail, detailYoY, lv2, lv1, lv2YoY, lv1YoY);
 
-        log.info("[销售日报] 开始生成 {} 报表（查询 {} / 环比 {} / 同比 {}），输出目录: {}",
-                today, q, m, y, new File(outputDir).getAbsolutePath());
+        log.info("[销售日报] 开始生成 {} 报表（查询 {}/{} / 环比 {}/{} / 同比 {}/{}，orgCode={}，明细层级={}），输出目录: {}",
+                today, q, end, m, mEnd, y, yEnd, org, detailLevel, new File(outputDir).getAbsolutePath());
 
         // ===== 3. 生成 HTML =====
         try {
@@ -140,7 +165,7 @@ public class SalesDailyReportService {
 
     private List<Map<String, Object>> query(String startDate, String endDate,
                                             String cmpStartDate, String cmpEndDate,
-                                            String deptLevels) {
+                                            String deptLevels, String orgCode) {
         return salesDetailService.getSalesDetail(
                 TENANT_ID, LANG, USER_NO,
                 DATE_TYPE, startDate, endDate,
@@ -148,6 +173,11 @@ public class SalesDailyReportService {
                 SHOW_STORE, deptLevels, "", SHOW_BRAND,
                 orgCode, "", "", "", "",
                 "0", "否", "显示日期");
+    }
+
+    /** 空值兜底：null/空串统一返回空串（传给引擎时不发送该条件则由后端走默认口径） */
+    private static String nvl(String s) {
+        return (s == null) ? "" : s.trim();
     }
 
     // ==================== 行数据组装（与前端 SalesDetail.vue 一致）====================
@@ -595,6 +625,14 @@ public class SalesDailyReportService {
             // 丢弃子进程输出，避免管道缓冲阻塞（渲染日志不影响截图结果）
             pb.redirectErrorStream(true);
             pb.redirectOutput(ProcessBuilder.Redirect.PIPE);
+            // 关键修复：每次截图前先删除已存在的同名 PNG。
+            // 否则同一天换机构（如 1101001→1103011）重发时，旧 PNG 仍在磁盘，
+            // 下方轮询逻辑会因「旧 PNG 已存在且体积>0」立即判定成功并强制杀掉 Chrome，
+            // 导致新 PNG 来不及覆盖（甚至被强杀中断），邮件最终收到的还是旧机构的图。
+            try {
+                Files.deleteIfExists(new File(pngPath).toPath());
+            } catch (Exception ignored) {
+            }
             process = pb.start();
             // Windows 下 chrome.exe 是 GUI 启动器：启动器进程会立即退出（exit 0），
             // 真正的渲染发生在它派生的子进程里，PNG 异步写入。
