@@ -163,6 +163,7 @@ public class SalesDetail2ReportService {
             row.sales += num(r.get("销售金额"));
             row.profit += num(r.get("含税毛利"));
             row.customers += num(r.get("交易笔数"));
+            row.stockAmount += num(r.get("当日库存金额"));
             row.momSales += num(r.get("对期销售金额"));
             row.momProfit += num(r.get("对期含税毛利"));
             row.momCustomers += num(r.get("对期交易笔数"));
@@ -244,6 +245,7 @@ public class SalesDetail2ReportService {
             s.sales += r.sales;
             s.profit += r.profit;
             s.customers += r.customers;
+            s.stockAmount += r.stockAmount;
             s.momSales += r.momSales;
             s.momProfit += r.momProfit;
             s.momCustomers += r.momCustomers;
@@ -318,7 +320,7 @@ public class SalesDetail2ReportService {
         boolean hasData;
 
         // 本期
-        double sales, profit, customers;
+        double sales, profit, customers, stockAmount;
         // 环比对期
         double momSales, momProfit, momCustomers;
         // 同比对期
@@ -358,6 +360,7 @@ public class SalesDetail2ReportService {
           .append(".c-profit{background:#e8f5e9 !important;}\n")
           .append(".c-customer{background:#e3f2fd !important;}\n")
           .append(".c-price{background:#fce4ec !important;}\n")
+          .append(".c-stock{background:#f3e5f5 !important;}\n")
           .append("tr.subtotal td{background:linear-gradient(90deg,#fff59d,#fff9c4);border-top:2px solid #f57f17;border-bottom:2px solid #f57f17;color:#4e342e;font-weight:700;}\n")
           .append(".rate-up{color:#d32f2f;font-weight:500;}\n")
           .append(".rate-down{color:#388e3c;font-weight:500;}\n")
@@ -368,9 +371,9 @@ public class SalesDetail2ReportService {
           .append("<span class=\"date yoy\">同比：").append(yoyDate).append(" ~ ").append(yoyDate).append("</span>\n")
           .append("</div></div>\n");
 
-        // 表头（15 列，与前端一致）
+        // 表头（16 列，与前端 SalesDetail2.vue 一致：含当日库存金额）
         sb.append("<table>\n<thead><tr>")
-          .append("<th>机构代码</th><th>机构名称</th>")
+          .append("<th>机构代码</th><th>机构名称</th><th class=\"c-stock\">当日库存金额</th>")
           .append("<th class=\"c-sales\">销售额/元</th><th class=\"c-sales\">同比<br>销售额增长率</th><th class=\"c-sales\">环比<br>销售额增长率</th>")
           .append("<th class=\"c-profit\">毛利额/元</th><th class=\"c-profit\">同比<br>毛利额增长率</th><th class=\"c-profit\">环比<br>毛利额增长率</th>")
           .append("<th class=\"c-profit\">毛利率</th>")
@@ -390,6 +393,8 @@ public class SalesDetail2ReportService {
             sb.append("<td class=\"col-code\">").append(esc(r.orgCode)).append("</td>");
             // 机构名称
             sb.append("<td class=\"col-org\">").append(esc(r.orgName)).append("</td>");
+            // 当日库存金额
+            appendNumTd(sb, "c-stock", r.stockAmount);
             // 销售额
             appendNumTd(sb, "c-sales", r.sales);
             // 同比/环比 销售额增长率
