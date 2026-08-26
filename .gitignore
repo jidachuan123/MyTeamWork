@@ -1,5 +1,11 @@
 # 忽略所有模块下的target编译目录
 target/
+.idea/
+# maven target
+target/
+**/target/
+
+
 
 # 忽略logs整个目录
 logs/
