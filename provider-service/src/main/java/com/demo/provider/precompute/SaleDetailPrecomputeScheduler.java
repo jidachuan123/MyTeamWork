@@ -41,7 +41,7 @@ public class SaleDetailPrecomputeScheduler {
     @Autowired
     private SaleDetailPrecomputeService saleDetailPrecomputeService;
 
-//    @Scheduled(cron = "${report.precompute.cron:0 0 2 * * ?}")
+    @Scheduled(cron = "${report.precompute.cron:0 0 2 * * ?}")
     public void runPrecompute() {
         LocalDate today = LocalDate.now();
         LocalDate queryDate = today.minusDays(1);   // 本期 = 昨天

@@ -185,8 +185,6 @@ public class SalesDetail2ReportService {
         List<StoreRow> storeRows = new ArrayList<>();
         for (StoreRow row : map.values()) {
             if (!row.hasData) continue;
-            // 当日库存金额=0 的门店不展示（与前端一致）
-            if (row.stockAmount == 0) continue;
             row.group = getGroup(row.orgCode);
             row.avgPrice = avgPriceOf(row.sales, row.customers);
             row.momAvgPrice = avgPriceOf(row.momSales, row.momCustomers);
