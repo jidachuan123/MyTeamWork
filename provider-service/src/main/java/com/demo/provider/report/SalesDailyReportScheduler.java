@@ -137,7 +137,7 @@ public class SalesDailyReportScheduler {
         return sb.toString();
     }
 
-    @Scheduled(cron = "${report.daily.cron:0 15 16 * * ?}")
+    @Scheduled(cron = "${report.daily.cron:0 15 8 * * ?}")
     public void runDailyReport() {
         log.info("[销售日报] 定时任务触发");
         String summary = runNow(LocalDate.now());
