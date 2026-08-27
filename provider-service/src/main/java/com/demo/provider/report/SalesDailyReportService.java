@@ -88,9 +88,21 @@ public class SalesDailyReportService {
      * @return 截图 PNG 路径（失败返回 null）
      */
     public String generateDailyReport(LocalDate date) {
-        // 定时任务：用配置 orgCode + 由 date 推算的日期，委托给参数版
+        // 定时任务（主收件人）：用配置 orgCode + 由 date 推算的日期，委托给参数版
+        return generateDailyReport(date, orgCode, null);
+    }
+
+    /**
+     * 生成某天销售日报（SalesDetail 页面），机构编码可覆盖、截图文件名可追加标识。
+     * 用于「第二收件人」发送不同机构的同一报表：orgCodeOverride 指定机构，
+     * fileTag 追加到 HTML/PNG 文件名（如 -1103011），避免同日不同机构截图文件名冲突。
+     * 日期规则与 generateDailyReport(date) 完全一致（本期=前一天、环比=前两天、同比=去年今天）。
+     *
+     * @return 截图 PNG 路径（失败返回 null）
+     */
+    public String generateDailyReport(LocalDate date, String orgCodeOverride, String fileTag) {
         DailyReportParam req = new DailyReportParam();
-        req.setOrgCode(orgCode);
+        req.setOrgCode(orgCodeOverride);
         req.setDeptLevels("3");
         req.setStartDate(date.minusDays(1).format(DTF));
         req.setEndDate(date.minusDays(1).format(DTF));
@@ -98,7 +110,7 @@ public class SalesDailyReportService {
         req.setCmpEndDate(date.minusDays(2).format(DTF));
         req.setYoyStartDate(date.minusYears(1).format(DTF));
         req.setYoyEndDate(date.minusYears(1).format(DTF));
-        return generateDailyReport(req);
+        return generateDailyReport(req, fileTag);
     }
 
     /**
@@ -108,6 +120,16 @@ public class SalesDailyReportService {
      * @return 截图 PNG 路径（失败返回 null）
      */
     public String generateDailyReport(DailyReportParam req) {
+        return generateDailyReport(req, null);
+    }
+
+    /**
+     * 按页面查询参数生成销售日报截图；fileTag 非空时追加到 HTML/PNG 文件名。
+     * fileTag 用于区分同日不同机构的截图（如 -1103011），避免文件名冲突被覆盖。
+     *
+     * @return 截图 PNG 路径（失败返回 null）
+     */
+    public String generateDailyReport(DailyReportParam req, String fileTag) {
         // 报表日期标签：取「本期结束日期」（与页面本期一致）；为空时回退今天
         String today = (req.getEndDate() != null && !req.getEndDate().trim().isEmpty())
                 ? req.getEndDate().trim()
@@ -144,7 +166,8 @@ public class SalesDailyReportService {
         } catch (Exception e) {
             return "创建输出目录失败: " + e.getMessage();
         }
-        String htmlPath = outputDir + "/sales-detail-" + today + ".html";
+        String tag = (fileTag != null && !fileTag.trim().isEmpty()) ? "-" + fileTag.trim() : "";
+        String htmlPath = outputDir + "/sales-detail-" + today + tag + ".html";
         try {
             Files.write(Paths.get(htmlPath), buildHtml(q, m, y, rows).getBytes(StandardCharsets.UTF_8));
             log.info("[销售日报] HTML 已生成: {}", new File(htmlPath).getAbsolutePath());
@@ -153,7 +176,7 @@ public class SalesDailyReportService {
         }
 
         // ===== 4. 截图 =====
-        String pngPath = outputDir + "/sales-detail-" + today + ".png";
+        String pngPath = outputDir + "/sales-detail-" + today + tag + ".png";
         boolean shotOk = screenshot(htmlPath, pngPath, rows.size());
 
         log.info("[销售日报] 报表生成完成，共 {} 行数据，截图: {} ({})",
@@ -735,9 +758,17 @@ public class SalesDailyReportService {
 
     // ==================== 邮件发送 ====================
 
-    public String sendMail(String today, List<String> pngPaths) {
-        if (mailTo == null || mailTo.trim().isEmpty()) {
-            return "未配置收件人（report.daily.mail-to），跳过邮件发送。\n";
+    /**
+     * 发送日报邮件（指定收件人 + 内容描述）。
+     * recipient 为空时回退到默认收件人 mailTo（report.daily.mail-to）。
+     *
+     * @param recipient 收件人邮箱；为空则用 mailTo
+     * @param desc      邮件正文中的报表范围描述（如「销售详情1 + 销售详情2」「销售详情1（1103011）」）
+     */
+    public String sendMail(String today, List<String> pngPaths, String recipient, String desc) {
+        String to = (recipient != null && !recipient.trim().isEmpty()) ? recipient.trim() : mailTo;
+        if (to == null || to.trim().isEmpty()) {
+            return "未配置收件人（report.daily.mail-to / 指定收件人），跳过邮件发送。\n";
         }
         if (mailSender == null || mailAuthCode == null || mailAuthCode.trim().isEmpty()) {
             return "未配置 SMTP 授权码（环境变量 MAIL_AUTH_CODE 或 spring.mail.password），跳过邮件发送。\n";
@@ -746,9 +777,9 @@ public class SalesDailyReportService {
             MimeMessage msg = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(msg, true, "UTF-8");
             helper.setFrom(mailFrom);
-            helper.setTo(mailTo);
+            helper.setTo(to);
             helper.setSubject("销售详情日报 " + today);
-            helper.setText("附件为 " + today + " 的销售详情报表截图（销售详情1 + 销售详情2），请查收。", false);
+            helper.setText("附件为 " + today + " 的销售详情报表截图（" + (desc == null ? "" : desc) + "），请查收。", false);
             for (String pngPath : pngPaths) {
                 File f = new File(pngPath);
                 if (f.exists()) {
@@ -756,10 +787,15 @@ public class SalesDailyReportService {
                 }
             }
             mailSender.send(msg);
-            return "邮件已发送至 " + mailTo + "，附件 " + pngPaths.size() + " 张。\n";
+            return "邮件已发送至 " + to + "，附件 " + pngPaths.size() + " 张。\n";
         } catch (Exception e) {
-            return "邮件发送失败: " + e.getMessage() + "\n";
+            return "邮件发送失败（" + to + "）: " + e.getMessage() + "\n";
         }
+    }
+
+    /** 兼容旧调用（手动触发 / 默认收件人）：发往 mailTo，正文标注销售详情1 + 销售详情2 */
+    public String sendMail(String today, List<String> pngPaths) {
+        return sendMail(today, pngPaths, mailTo, "销售详情1 + 销售详情2");
     }
 
     void ensureOutputDir() throws Exception {

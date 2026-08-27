@@ -53,7 +53,7 @@ public class SalesDailyReportController {
         if (png == null) {
             return ApiResult.ok("销售详情1 截图生成失败（检查浏览器/输出目录日志）");
         }
-        String mail = salesDailyReportService.sendMail(reportDate(req), Collections.singletonList(png));
+        String mail = salesDailyReportService.sendMail(reportDate(req), Collections.singletonList(png), null, "销售详情1");
         return ApiResult.ok("销售详情1 截图：" + png + "\n" + mail);
     }
 
@@ -67,7 +67,7 @@ public class SalesDailyReportController {
         if (png == null) {
             return ApiResult.ok("销售详情2 截图生成失败（检查浏览器/输出目录日志）");
         }
-        String mail = salesDailyReportService.sendMail(reportDate(req), Collections.singletonList(png));
+        String mail = salesDailyReportService.sendMail(reportDate(req), Collections.singletonList(png), null, "销售详情2");
         return ApiResult.ok("销售详情2 截图：" + png + "\n" + mail);
     }
 
