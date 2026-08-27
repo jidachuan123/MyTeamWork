@@ -49,12 +49,12 @@ eureka:
 # ===== 销售详情日报（每天下午 16:15 定时任务）=====
 report:
   daily:
-    cron: "0 22 16 * * ?"         # 每天下午 16:15 触发
+    cron: "0 41 08 * * ?"         # 每天下午 16:15 触发
     org-code: "1101001"           # SalesDetail 机构编码（主收件人 1137851593@qq.com 用）
     org-code2: "1101,1102,1191001" # SalesDetail2 机构编码（巨野组/便利组）
     org-code-extra: "1103011"     # 第二收件人 591111450@qq.com 专用：销售详情1 截图机构编码
     mail-to: "1137851593@qq.com"   # 主收件人（销售详情1 + 销售详情2 两张截图）
-    mail-to-2: "@qq.com"  # 第二收件人（仅销售详情1，机构=org-code-extra）
+    mail-to-2: "386323281@qq.com"  # 第二收件人（仅销售详情1，机构=org-code-extra）
     mail-from: "591111450@qq.com" # 发件人（需与 spring.mail.username 一致）
     chrome-path: ""               # 留空则自动探测 Chrome/Edge 路径
     output-dir: "C:/work/MyTeamWork/provider-service/target/report"  # HTML/截图输出目录
