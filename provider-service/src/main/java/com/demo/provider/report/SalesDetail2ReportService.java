@@ -23,7 +23,7 @@ import java.util.*;
  *   2. 同比调用：cmpStartDate/cmpEndDate = 同比日期 → 对期* 字段 = 同比值
  *
  * 入参：deptLevels=""（不传）、department=""（不传）、orgCode=1101,1102,1191001
- * 按机构编码分组（巨野中心店组 / 便利组），组内各店求和，组尾出合计行。
+ * 按机构编码前四位分组（1101/1102/1103/1104…，前四位相同即同组，升序），组内各店求和，组尾出「合计」行。
  *
  * 日期规则：本期=前一天、环比=前两天、同比=去年的今天
  */
@@ -233,11 +233,16 @@ public class SalesDetail2ReportService {
             row.momAvgPriceRate = rate(row.avgPrice, row.momAvgPrice);
             storeRows.add(row);
         }
+        // 按机构编码升序（前四位相同即同组，升序后同组自然连续）
         storeRows.sort(Comparator.comparing(r -> String.valueOf(r.orgCode)));
 
-        // 按组分段 + 组尾合计行
+        // 按组（前四位）分段 + 组尾合计行：组 = 出现过的前四位，升序（如 1101、1102、1103、1104、1191…）
         List<StoreRow> result = new ArrayList<>();
-        String[] groups = {"巨野中心店组", "便利组"};
+        List<String> groups = new ArrayList<>();
+        for (StoreRow r : storeRows) {
+            if (!groups.contains(r.group)) groups.add(r.group);
+        }
+        Collections.sort(groups);
         for (String g : groups) {
             List<StoreRow> grp = new ArrayList<>();
             for (StoreRow r : storeRows) {
@@ -245,34 +250,23 @@ public class SalesDetail2ReportService {
             }
             if (!grp.isEmpty()) {
                 result.addAll(grp);
-                result.add(buildSubtotal(grp, g));
+                result.add(buildSubtotal(grp));
             }
-        }
-        // 其他
-        List<StoreRow> others = new ArrayList<>();
-        for (StoreRow r : storeRows) {
-            if (!"巨野中心店组".equals(r.group) && !"便利组".equals(r.group)) others.add(r);
-        }
-        if (!others.isEmpty()) {
-            result.addAll(others);
-            result.add(buildSubtotal(others, "其他"));
         }
         return result;
     }
 
-    /** 机构分组：1101xxx/1191xxx=巨野中心店组；1102xxx=便利组；其余=其他 */
+    /** 机构分组：按机构编码前四位归类（1101/1102/1103/1104…，前四位相同即同组）。与前端 SalesDetail2.vue 同源 */
     private String getGroup(String code) {
         if (code == null) return "其他";
-        if (code.startsWith("1101") || code.startsWith("1191")) return "巨野中心店组";
-        if (code.startsWith("1102")) return "便利组";
-        return "其他";
+        return code.length() >= 4 ? code.substring(0, 4) : code;
     }
 
-    /** 合计行：金额求和，派生指标按合计值公式计算 */
-    private StoreRow buildSubtotal(List<StoreRow> rows, String groupName) {
+    /** 合计行：金额求和，派生指标按合计值公式计算。合计行统一只叫「合计」（不带组名前缀） */
+    private StoreRow buildSubtotal(List<StoreRow> rows) {
         StoreRow s = new StoreRow("");
         s.isSubtotal = true;
-        s.orgName = groupName + " 合计";
+        s.orgName = "合计";
         for (StoreRow r : rows) {
             if ("1102911".equals(r.orgCode)) continue;  // 巨野便利店配送中心为配送中心，不当门店，整行不进门店合计
             s.sales += r.sales;
