@@ -17,8 +17,10 @@ import java.util.List;
  *
  * 默认每天下午 16:15 触发（cron 可在 application.yml 的 report.daily.cron 修改）。
  * 每日生成两类报表截图并各发一封邮件：
- *   1) 主收件人（report.daily.mail-to，默认 1137851593@qq.com）：销售详情1（orgCode=report.daily.org-code）
- *      + 销售详情2（orgCode=report.daily.org-code2）两张截图，一封邮件发送。
+ *   1) 主收件人（report.daily.mail-to，默认 1137851593@qq.com）：共三张截图，一封邮件发送。
+ *      - 销售详情1（orgCode=report.daily.org-code，默认 1101001）——文件名 sales-detail-{today}.png
+ *      - 销售详情2（orgCode=report.daily.org-code2）——文件名 sales-detail2-{today}.png
+ *      - 销售详情1（orgCode=report.daily.org-code-3，默认 1101031）——文件名带 -1101031 防冲突
  *   2) 第二收件人（report.daily.mail-to-2，默认 591111450@qq.com）：仅销售详情1 截图，
  *      机构编码=report.daily.org-code-extra（默认 1103011），文件名带 -1103011 防冲突；
  *      日期逻辑与第 1) 类完全一致。
@@ -47,6 +49,12 @@ public class SalesDailyReportScheduler {
 
     @Value("${report.daily.org-code-extra:1103011}")
     private String orgCodeExtra;
+
+    @Value("${report.daily.org-code-3:1101031}")
+    private String orgCodeThird;
+
+    @Value("${report.daily.org-code:1101001}")
+    private String orgCode;
 
     /**
      * 手动/立即执行销售日报完整流程（含截图 + 邮件）。
@@ -93,6 +101,21 @@ public class SalesDailyReportScheduler {
             log.error("[销售日报] 销售详情2 生成异常", e);
         }
 
+        // 2.5 销售详情1（主收件人第三张，orgCode=report.daily.org-code-3，默认 1101031）
+        //     与第 1 步同一张报表、仅机构编码不同（1101001 -> 1101031）；文件名追加 -1101031 防冲突
+        try {
+            String png1b = salesDailyReportService.generateDailyReport(date, orgCodeThird, orgCodeThird);
+            if (png1b != null) {
+                pngPrimary.add(png1b);
+                sb.append("销售详情1(").append(orgCodeThird).append(") 截图成功：").append(png1b).append("\n");
+            } else {
+                sb.append("销售详情1(").append(orgCodeThird).append(") 截图失败\n");
+            }
+        } catch (Exception e) {
+            sb.append("销售详情1(").append(orgCodeThird).append(") 生成异常：").append(e.getMessage()).append("\n");
+            log.error("[销售日报] 销售详情1(third) 生成异常", e);
+        }
+
         // 3. 销售详情1（第二收件人，orgCode=report.daily.org-code-extra，默认 1103011）
         //    文件名追加 -1103011 避免同日不同机构截图被覆盖；日期逻辑与前两处完全一致
         try {
@@ -111,7 +134,7 @@ public class SalesDailyReportScheduler {
         // 4. 分别发送两封邮件
         if (!pngPrimary.isEmpty()) {
             try {
-                String result = salesDailyReportService.sendMail(todayStr, pngPrimary, mailTo, "销售详情1 + 销售详情2");
+                String result = salesDailyReportService.sendMail(todayStr, pngPrimary, mailTo, "销售详情1(" + orgCode + ") + 销售详情2 + 销售详情1(" + orgCodeThird + ")");
                 sb.append("邮件(").append(mailTo).append(") 发送结果：").append(result.trim()).append("\n");
             } catch (Exception e) {
                 sb.append("邮件(").append(mailTo).append(") 发送异常：").append(e.getMessage()).append("\n");
