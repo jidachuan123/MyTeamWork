@@ -63,7 +63,7 @@ eureka:
 # ============================================================
 report:
   daily:
-    cron: "0 36 11 * * ?"          # 定时发送时间（cron 表达式）
+    cron: "0 15 8 * * ?"          # 定时发送时间（cron 表达式）
     mail-from: "591111450@qq.com"  # 发件人（需与 spring.mail.username 一致）
     mail-to: "591111450@qq.com"    # 默认收件人兜底（仅手动触发接口用；定时任务收件人看下方 main/secondary）
     chrome-path: ""                # 留空则自动探测 Chrome/Edge 路径
@@ -71,7 +71,7 @@ report:
 
     # ---------- 主邮件（目前 3 张截图） ----------
     main:
-      mail-to: "591111450@qq.com"   # 主收件人
+      mail-to: "1137851593@qq.com"   # 主收件人
       screenshots:
         - type: sd1                # 销售详情1（主图）
           org-code: "1101001"
@@ -80,12 +80,12 @@ report:
           org-code: "1101031"
           tag: "1101031"           # sales-detail-{日期}-1101031.png
         - type: sd2                # 销售详情2
-          org-code: "1101,1102,1191001"
+          org-code: "1101,1102,1191001,1191201"
           tag: ""                  # 无后缀：sales-detail2-{日期}.png
 
     # ---------- 副邮件（目前 2 张截图） ----------
     secondary:
-      mail-to: "591111450@qq.com"  # 副收件人
+      mail-to: "386323281@qq.com"  # 副收件人
       screenshots:
         - type: sd1                # 销售详情1（机构 1103011）
           org-code: "1103011"
