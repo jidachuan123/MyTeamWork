@@ -164,6 +164,7 @@ public class SalesDetail2ReportService {
             row.profit += num(r.get("含税毛利"));
             row.customers += num(r.get("交易笔数"));
             row.stockAmount += num(r.get("当日库存金额"));
+            row.hasStock = true;
             row.momSales += num(r.get("对期销售金额"));
             row.momProfit += num(r.get("对期含税毛利"));
             row.momCustomers += num(r.get("对期交易笔数"));
@@ -171,20 +172,27 @@ public class SalesDetail2ReportService {
         }
 
         // 同比调用：同比对期值
+        // 与前端 SalesDetail2.vue 一致：同比有、本期无的机构也要创建并展示（全 0 占位行）
         for (Map<String, Object> r : yoyData) {
             String code = str(r.get("机构编码"));
             if (code == null || code.isEmpty()) continue;
-            StoreRow row = map.get(code);
-            if (row == null) continue;
+            StoreRow row = map.computeIfAbsent(code, k -> new StoreRow(code));
+            if (row.orgName.isEmpty()) row.orgName = str(r.get("机构名称"));
             row.yoySales += num(r.get("对期销售金额"));
             row.yoyProfit += num(r.get("对期含税毛利"));
             row.yoyCustomers += num(r.get("对期交易笔数"));
+            // 当日库存金额 = 本期当天的实时库存快照（与 cmp 对比期参数无关）：
+            // 环比调用未返回该店（本期无销售、仅同比有，如 1102027）时，用同比调用返回的库存补上；
+            // 已有库存（环比调用返回过）则跳过，避免两个接口同一库存重复累加翻倍。
+            if (!row.hasStock) {
+                row.stockAmount += num(r.get("当日库存金额"));
+                row.hasStock = true;
+            }
         }
 
-        // 派生指标
+        // 派生指标（与前端一致：全 0 门店也占位显示，不因 hasData=false 跳过）
         List<StoreRow> storeRows = new ArrayList<>();
         for (StoreRow row : map.values()) {
-            if (!row.hasData) continue;
             row.group = getGroup(row.orgCode);
             row.avgPrice = avgPriceOf(row.sales, row.customers);
             row.momAvgPrice = avgPriceOf(row.momSales, row.momCustomers);
@@ -318,6 +326,7 @@ public class SalesDetail2ReportService {
         String group = "";
         boolean isSubtotal;
         boolean hasData;
+        boolean hasStock;  // 库存是否已赋值（防 MOM/YOY 两个接口重复累加当日库存翻倍）
 
         // 本期
         double sales, profit, customers, stockAmount;
