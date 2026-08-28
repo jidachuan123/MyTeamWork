@@ -191,6 +191,8 @@ public class SalesDetail2ReportService {
         }
 
         // 派生指标（与前端一致：全 0 门店也占位显示，不因 hasData=false 跳过）
+        // 注意：当日库存金额为 0 的门店【不参与展示但必须参与计算】——它们的销售额/毛利额等
+        // 仍要累加进合计并参与百分比计算（用户明确要求"隐藏而非过滤"），渲染层负责隐藏（见 buildHtml）
         List<StoreRow> storeRows = new ArrayList<>();
         for (StoreRow row : map.values()) {
             row.group = getGroup(row.orgCode);
@@ -392,6 +394,8 @@ public class SalesDetail2ReportService {
 
         int idx = 0;
         for (StoreRow r : rows) {
+            // 当日库存金额为 0 的门店：不生成行（截图里隐藏），但数据已参与合计/派生计算（与前端 v-show 同源隐藏）
+            if (!r.isSubtotal && r.stockAmount <= 0) continue;
             idx++;
             if (r.isSubtotal) {
                 sb.append("<tr class=\"subtotal\">");
