@@ -311,4 +311,12 @@ public class SaleDetailPrecomputeService {
         String rt = (reportType == null || reportType.trim().isEmpty()) ? REPORT_TYPE : reportType.trim();
         return precomputeRepository.lastBatchLogs(limit <= 0 ? 20 : limit, rt);
     }
+
+    /**
+     * UNION ALL 追加「仅库存」门店（3003 页面勾选 Union 特殊逻辑时调用，与 /detail 接口同源）。
+     * 预计算表是凌晨跑批快照；补充行库存取实时 tb_wb_gdsstock，仅用于排查/核对。
+     */
+    public void mergeStockOnlyRows(List<Map<String, Object>> data, String codes) {
+        salesDetailService.mergeStockOnlyRows(data, codes);
+    }
 }

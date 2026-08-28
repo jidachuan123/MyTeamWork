@@ -96,6 +96,7 @@ report:
         - type: sd2                # 销售详情2（机构 1103,1104）—— 与主邮件 SD2 同参数，仅机构不同
           org-code: "1103,1104"
           tag: "1103-1104"         # sales-detail2-{日期}-1103-1104.png
+          union-stock-codes: "1104901,1103801"   # 追加「仅库存」门店（UNION ALL 语义）：即使无销售也显示库存行；留空不追加
   # ===== 销售报表1 预计算（每天凌晨 2:00 定时跑批，结果存 dw.rpt_sale_detail_precompute）=====
   precompute:
     cron: "0 0 2 * * ?"           # 每天凌晨 2:00 触发

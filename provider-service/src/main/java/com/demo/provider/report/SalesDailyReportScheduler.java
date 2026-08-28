@@ -77,11 +77,12 @@ public class SalesDailyReportScheduler {
             String type = (task.getType() == null) ? "sd1" : task.getType().trim().toLowerCase();
             String orgCode = (task.getOrgCode() == null) ? "" : task.getOrgCode().trim();
             String tag = (task.getTag() == null) ? "" : task.getTag().trim();
+            String unionStockCodes = (task.getUnionStockCodes() == null) ? "" : task.getUnionStockCodes().trim();
             String label = ("sd2".equals(type) ? "销售详情2" : "销售详情1") + (orgCode.isEmpty() ? "" : "(" + orgCode + ")");
             try {
                 String png;
                 if ("sd2".equals(type)) {
-                    png = salesDetail2ReportService.generateDailyReport(date, orgCode, tag);
+                    png = salesDetail2ReportService.generateDailyReport(date, orgCode, tag, unionStockCodes);
                 } else {
                     png = salesDailyReportService.generateDailyReport(date, orgCode, tag);
                 }

@@ -56,8 +56,14 @@ public class PrecomputeController {
             @RequestParam String comparisonType,
             @RequestParam(defaultValue = "1101001") String orgCode,
             @RequestParam(defaultValue = "") String deptLevels,
-            @RequestParam(defaultValue = "SALE_DETAIL_1") String reportType) {
-        return saleDetailPrecomputeService.query(queryDate, comparisonType, orgCode, deptLevels, reportType);
+            @RequestParam(defaultValue = "SALE_DETAIL_1") String reportType,
+            @RequestParam(defaultValue = "") String unionStockCodes) {
+        List<Map<String, Object>> result = saleDetailPrecomputeService.query(queryDate, comparisonType, orgCode, deptLevels, reportType);
+        // Union 特殊逻辑（与 /provider/sales/detail 同源）：勾选后 UNION ALL 追加「仅库存」门店
+        if (unionStockCodes != null && !unionStockCodes.trim().isEmpty()) {
+            saleDetailPrecomputeService.mergeStockOnlyRows(result, unionStockCodes.trim());
+        }
+        return result;
     }
 
     /**

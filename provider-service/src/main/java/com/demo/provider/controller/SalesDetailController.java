@@ -49,6 +49,9 @@ public class SalesDetailController {
      * @param comparableStore 可比门店，默认 0
      * @param showPlan        是否展示计划，默认 否
      * @param showDate        是否显示日期，默认 显示日期
+     * @param unionStockCodes Union 特殊逻辑：逗号分隔机构编码（如 "1104901,1103801"），非空时
+     *                        查询结果 UNION ALL 追加这些「仅库存」门店（其余列按 0/NULL 处理）。
+     *                        前端页面/对照页勾选「Union特殊逻辑」复选框时传入，留空=不追加。
      * @return 销售详情结果列表
      */
     @GetMapping("/detail")
@@ -72,15 +75,21 @@ public class SalesDetailController {
             @RequestParam(defaultValue = "") String channel,
             @RequestParam(defaultValue = "0") String comparableStore,
             @RequestParam(defaultValue = "否") String showPlan,
-            @RequestParam(defaultValue = "显示日期") String showDate
+            @RequestParam(defaultValue = "显示日期") String showDate,
+            @RequestParam(defaultValue = "") String unionStockCodes
     ) {
-        return salesDetailService.getSalesDetail(
+        List<Map<String, Object>> result = salesDetailService.getSalesDetail(
                 tenantId, lang, userNo,
                 dateType, startDate, endDate,
                 cmpStartDate, cmpEndDate,
                 showStore, deptLevels, catLevels, showBrand,
                 orgCode, department, category, brand, channel,
                 comparableStore, showPlan, showDate);
+        // Union 特殊逻辑：勾选后 UNION ALL 追加「仅库存」门店（引擎未返回的补充行，防翻倍）
+        if (unionStockCodes != null && !unionStockCodes.trim().isEmpty()) {
+            salesDetailService.mergeStockOnlyRows(result, unionStockCodes.trim());
+        }
+        return result;
     }
 
     /**

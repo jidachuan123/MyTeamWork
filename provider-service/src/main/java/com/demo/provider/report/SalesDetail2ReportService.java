@@ -75,6 +75,20 @@ public class SalesDetail2ReportService {
      * @return 截图 PNG 路径（失败返回 null）
      */
     public String generateDailyReport(LocalDate date, String orgCodeOverride, String fileTag) {
+        return generateDailyReport(date, orgCodeOverride, fileTag, null);
+    }
+
+    /**
+     * 生成某天销售详情2 截图，机构编码可覆盖、截图文件名可追加标识，并可追加「仅库存」门店。
+     * 用于「副邮件/多机构」场景：orgCodeOverride 指定机构（如 1103,1104），
+     * fileTag 追加到 HTML/PNG 文件名（如 -1103-1104），避免同日不同机构截图文件名冲突。
+     * unionStockCodes：逗号分隔机构编码，这些门店即使引擎查询未返回（无销售）也会补进截图，
+     * 仅带库存三列（机构编码/机构名称/当日库存金额），其余指标按 0 处理（UNION ALL 语义，见 mergeStockOnlyRows）。
+     * 日期规则与 generateDailyReport(date) 完全一致（本期=前一天、环比=前两天、同比=去年今天）。
+     *
+     * @return 截图 PNG 路径（失败返回 null）
+     */
+    public String generateDailyReport(LocalDate date, String orgCodeOverride, String fileTag, String unionStockCodes) {
         DailyReportParam req = new DailyReportParam();
         req.setOrgCode(orgCodeOverride);
         req.setDeptLevels("");
@@ -85,7 +99,7 @@ public class SalesDetail2ReportService {
         req.setCmpEndDate(date.minusDays(2).format(DTF));
         req.setYoyStartDate(date.minusYears(1).format(DTF));
         req.setYoyEndDate(date.minusYears(1).format(DTF));
-        return generateDailyReport(req, fileTag);
+        return generateDailyReport(req, fileTag, unionStockCodes);
     }
 
     /**
@@ -95,7 +109,7 @@ public class SalesDetail2ReportService {
      * @return 截图 PNG 路径（失败返回 null）
      */
     public String generateDailyReport(DailyReportParam req) {
-        return generateDailyReport(req, null);
+        return generateDailyReport(req, null, null);
     }
 
     /**
@@ -105,6 +119,16 @@ public class SalesDetail2ReportService {
      * @return 截图 PNG 路径（失败返回 null）
      */
     public String generateDailyReport(DailyReportParam req, String fileTag) {
+        return generateDailyReport(req, fileTag, null);
+    }
+
+    /**
+     * 按页面查询参数生成销售详情2 截图；fileTag 非空时追加到 HTML/PNG 文件名；
+     * unionStockCodes 非空时，取数后 UNION ALL 追加「仅库存」门店（见 mergeStockOnlyRows）。
+     *
+     * @return 截图 PNG 路径（失败返回 null）
+     */
+    public String generateDailyReport(DailyReportParam req, String fileTag, String unionStockCodes) {
         // 报表日期标签：取「本期结束日期」；为空时回退今天
         String today = (req.getEndDate() != null && !req.getEndDate().trim().isEmpty())
                 ? req.getEndDate().trim() : LocalDate.now().format(DTF);
@@ -127,6 +151,14 @@ public class SalesDetail2ReportService {
         List<Map<String, Object>> momData = query(q, end, m, mEnd, org, deptLevels, dept);
         // 同比调用：对比日期 = 同比日期；同比对期值从此结果取
         List<Map<String, Object>> yoyData = query(q, end, y, yEnd, org, deptLevels, dept);
+
+        // ===== 1.5 副收件人特例：UNION ALL 追加「仅库存」门店 =====
+        // 引擎查询只返回有销售的门店；unionStockCodes 指定的门店（如 1104901/1103801）即使无销售
+        // 也要出现在截图里（仅机构编码/机构名称/当日库存金额三列，其余列按 NULL=0 处理）。
+        // 语义等同 UNION ALL + 按机构编码聚合：引擎已返回的门店不重复追加（防同源库存翻倍）。
+        if (unionStockCodes != null && !unionStockCodes.trim().isEmpty()) {
+            mergeStockOnlyRows(momData, yoyData, unionStockCodes);
+        }
 
         // ===== 2. 组装表格行 =====
         List<StoreRow> rows = buildRows(momData, yoyData);
@@ -169,6 +201,53 @@ public class SalesDetail2ReportService {
                 SHOW_STORE, deptLevels, "", SHOW_BRAND,
                 orgCode, department, "", "", "",
                 "0", "否", "显示日期");
+    }
+
+    /**
+     * UNION ALL 追加「仅库存」门店（副收件人销售详情2 截图专用）。
+     *
+     * 补充 SQL 只返回 机构编码 / 机构名称 / 当日库存金额 三列（与引擎最终 SELECT 列名一致），
+     * 其余列未设置，buildRows 取数时自动按 0/NULL 处理 —— 等价于用户要求的
+     * 「引擎 SQL UNION ALL 补充 SQL，其余列用 NULL 补齐」。
+     *
+     * 防翻倍：补充库存来自 tb_wb_gdsstock 的 SUM(c_at_cost)，与引擎最终 SELECT 的 mykucun
+     * 库存子查询同源同值；因此引擎已返回过的门店（本期或同比出现）跳过，只补真正缺失的门店。
+     *
+     * @param momData 环比查询结果（补充行追加到这里，进入 buildRows 的 mom 循环：hasStock=true、按全 0 门店展示）
+     * @param yoyData 同比查询结果（仅用于收集已存在机构，避免补重复行）
+     * @param codes   逗号分隔机构编码，如 "1104901,1103801"
+     */
+    private void mergeStockOnlyRows(List<Map<String, Object>> momData, List<Map<String, Object>> yoyData, String codes) {
+        try {
+            // 已存在机构编码集合（引擎已返回的门店跳过，防止同 code 库存翻倍）
+            Set<String> exists = new HashSet<>();
+            for (Map<String, Object> r : momData) {
+                String c = str(r.get("机构编码"));
+                if (!c.isEmpty()) exists.add(c);
+            }
+            for (Map<String, Object> r : yoyData) {
+                String c = str(r.get("机构编码"));
+                if (!c.isEmpty()) exists.add(c);
+            }
+
+            List<Map<String, Object>> extra = salesDetailService.getStockOnlyRows(codes);
+            int added = 0;
+            for (Map<String, Object> r : extra) {
+                String c = str(r.get("机构编码"));
+                if (c.isEmpty() || exists.contains(c)) continue;
+                momData.add(r);
+                exists.add(c);
+                added++;
+            }
+            if (added > 0) {
+                log.info("[销售详情2] UNION ALL 追加仅库存门店 {} 家（{}），截图将包含这些门店的库存行", added, codes);
+            } else {
+                log.info("[销售详情2] UNION ALL 补充门店无新增（{} 均已存在或查无数据）", codes);
+            }
+        } catch (Exception e) {
+            // 补充行失败不影响主报表（与页面查询一致），仅记录
+            log.error("[销售详情2] UNION ALL 追加仅库存门店失败（codes={}），忽略继续", codes, e);
+        }
     }
 
     // ==================== 行数据组装（与前端 SalesDetail2.vue 一致）====================

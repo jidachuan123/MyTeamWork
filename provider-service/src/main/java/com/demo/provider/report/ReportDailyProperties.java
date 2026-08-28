@@ -77,6 +77,10 @@ public class ReportDailyProperties {
         private String orgCode = "";
         /** 文件名后缀：同一报表多张不同机构时必填（如 "1101031" → sales-detail-{date}-1101031.png），留空则不带后缀 */
         private String tag = "";
+        /** 追加「仅库存」门店（UNION ALL 补充行，目前用于副收件人销售详情2）：逗号分隔机构编码，
+         *  如 "1104901,1103801"。这些门店即使引擎查询未返回（无销售）也会出现在截图里，仅带库存三列，
+         *  其余指标按 0 处理；引擎已返回的门店不重复追加（防库存翻倍）。留空不追加。 */
+        private String unionStockCodes = "";
 
         public String getType() {
             return type;
@@ -100,6 +104,14 @@ public class ReportDailyProperties {
 
         public void setTag(String tag) {
             this.tag = tag;
+        }
+
+        public String getUnionStockCodes() {
+            return unionStockCodes;
+        }
+
+        public void setUnionStockCodes(String unionStockCodes) {
+            this.unionStockCodes = unionStockCodes;
         }
     }
 

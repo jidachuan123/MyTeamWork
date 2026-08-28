@@ -1,5 +1,7 @@
 package com.demo.provider.service;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
@@ -20,6 +22,8 @@ import java.util.*;
  */
 @Service
 public class SalesDetailService {
+
+    private static final Logger log = LoggerFactory.getLogger(SalesDetailService.class);
 
     @Autowired
     @Qualifier("scDataSource")
@@ -94,6 +98,102 @@ public class SalesDetailService {
         }
 
         return results;
+    }
+
+    /**
+     * 查询「仅库存」门店（副收件人销售详情2 截图专用补充行，UNION ALL 语义）
+     *
+     * 执行用户指定的补充 SQL：只返回 机构编码 / 机构名称 / 当日库存金额 三列，
+     * 合并进主查询结果时其余列由调用方按 NULL（=0）处理。
+     *
+     * @param codes 逗号分隔的机构编码，如 "1104901,1103801"
+     * @return 补充门店列表（机构编码/机构名称/当日库存金额）
+     */
+    public List<Map<String, Object>> getStockOnlyRows(String codes) {
+        String inList = buildInList(codes);
+        String sql = "SELECT sto.c_store_id AS 机构编码,\n" +
+                "       s.c_name AS 机构名称,\n" +
+                "       SUM(sto.c_at_cost) AS 当日库存金额\n" +
+                "FROM tb_wb_gdsstock sto (NOLOCK)\n" +
+                "LEFT JOIN tb_store s ON sto.c_store_id = s.c_id\n" +
+                "WHERE sto.c_store_id IN (" + inList + ")\n" +
+                "GROUP BY sto.c_store_id, s.c_name\n" +
+                "ORDER BY sto.c_store_id";
+
+        List<Map<String, Object>> results = new ArrayList<>();
+        try (Connection conn = scDataSource.getConnection();
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+            ResultSetMetaData meta = rs.getMetaData();
+            int columnCount = meta.getColumnCount();
+            while (rs.next()) {
+                Map<String, Object> row = new LinkedHashMap<>();
+                for (int i = 1; i <= columnCount; i++) {
+                    row.put(meta.getColumnLabel(i), rs.getObject(i));
+                }
+                results.add(row);
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("仅库存门店查询失败: " + e.getMessage(), e);
+        }
+        return results;
+    }
+
+    /**
+     * UNION ALL 追加「仅库存」门店（页面查询 / 对照页勾选 Union 特殊逻辑时调用，与截图服务同源）。
+     *
+     * 补充 SQL 只返回 机构编码 / 机构名称 / 当日库存金额 三列（与引擎最终 SELECT 列名一致），
+     * 其余列未设置，前端取数时自动按 0/NULL 处理 —— 等价于用户要求的
+     * 「引擎 SQL UNION ALL 补充 SQL，其余列用 NULL 补齐」。
+     *
+     * 防翻倍：引擎已返回过的门店跳过，只补真正缺失的门店；前端 buildRows 的 hasStock
+     * 防重逻辑兜底（补充行库存与引擎 mykucun 同源同值，重复累加会翻倍）。
+     *
+     * @param data  本次查询结果（引擎已返回的行；缺失门店追加到这里）
+     * @param codes 逗号分隔机构编码，如 "1104901,1103801"
+     */
+    public void mergeStockOnlyRows(List<Map<String, Object>> data, String codes) {
+        try {
+            Set<String> exists = new HashSet<>();
+            for (Map<String, Object> r : data) {
+                Object c = r.get("机构编码");
+                if (c != null && !String.valueOf(c).trim().isEmpty()) {
+                    exists.add(String.valueOf(c).trim());
+                }
+            }
+            List<Map<String, Object>> extra = getStockOnlyRows(codes);
+            int added = 0;
+            for (Map<String, Object> r : extra) {
+                Object c = r.get("机构编码");
+                String code = (c == null) ? "" : String.valueOf(c).trim();
+                if (code.isEmpty() || exists.contains(code)) continue;
+                data.add(r);
+                exists.add(code);
+                added++;
+            }
+            if (added > 0) {
+                log.info("[销售详情] UNION ALL 追加仅库存门店 {} 家（{}），页面将包含这些门店的库存行", added, codes);
+            } else {
+                log.info("[销售详情] UNION ALL 补充门店无新增（{} 均已存在或查无数据）", codes);
+            }
+        } catch (Exception e) {
+            // 补充行失败不影响主查询（与截图服务一致），仅记录
+            log.error("[销售详情] UNION ALL 追加仅库存门店失败（codes={}），忽略继续", codes, e);
+        }
+    }
+
+    /** 逗号分隔机构编码 → IN 列表（单引号转义） */
+    private String buildInList(String codes) {
+        StringBuilder sb = new StringBuilder();
+        if (codes != null) {
+            for (String p : codes.split(",")) {
+                String t = p.trim();
+                if (t.isEmpty()) continue;
+                if (sb.length() > 0) sb.append(",");
+                sb.append("'").append(esc(t)).append("'");
+            }
+        }
+        return sb.length() == 0 ? "''" : sb.toString();
     }
 
     /**
