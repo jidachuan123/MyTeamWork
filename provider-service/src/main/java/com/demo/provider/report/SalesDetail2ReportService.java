@@ -25,7 +25,7 @@ import java.util.*;
  * 入参：deptLevels=""（不传）、department=""（不传）、orgCode=1101,1102,1191001
  * 按机构编码前四位分组（1101/1102/1103/1104…，前四位相同即同组，升序），组内各店求和，组尾出「合计」行。
  *
- * 日期规则：本期=前一天、环比=前两天、同比=去年的今天
+ * 日期规则：本期=前一天、环比=前两天、同比=去年本期就近同周几
  */
 @Service
 public class SalesDetail2ReportService {
@@ -58,7 +58,7 @@ public class SalesDetail2ReportService {
      * 生成某天的销售详情2 报表：取数 → HTML → 截图
      *
      * 定时任务：机构编码取配置 report.daily.org-code2（默认 1101,1102,1191001），
-     * 日期由 date 推算（本期=前一天、环比=前两天、同比=去年今天），部门层级/部门编码留空走后端默认口径。
+     * 日期由 date 推算（本期=前一天、环比=前两天、同比=去年本期就近同周几），部门层级/部门编码留空走后端默认口径。
      *
      * @return 截图 PNG 路径（失败返回 null）
      */
@@ -70,7 +70,7 @@ public class SalesDetail2ReportService {
      * 生成某天销售详情2 截图，机构编码可覆盖、截图文件名可追加标识。
      * 用于「副邮件/多机构」场景：orgCodeOverride 指定机构（如 1103,1104），
      * fileTag 追加到 HTML/PNG 文件名（如 -1103-1104），避免同日不同机构截图文件名冲突。
-     * 日期规则与 generateDailyReport(date) 完全一致（本期=前一天、环比=前两天、同比=去年今天）。
+     * 日期规则与 generateDailyReport(date) 完全一致（本期=前一天、环比=前两天、同比=去年本期就近同周几）。
      *
      * @return 截图 PNG 路径（失败返回 null）
      */
@@ -84,7 +84,7 @@ public class SalesDetail2ReportService {
      * fileTag 追加到 HTML/PNG 文件名（如 -1103-1104），避免同日不同机构截图文件名冲突。
      * unionStockCodes：逗号分隔机构编码，这些门店即使引擎查询未返回（无销售）也会补进截图，
      * 仅带库存三列（机构编码/机构名称/当日库存金额），其余指标按 0 处理（UNION ALL 语义，见 mergeStockOnlyRows）。
-     * 日期规则与 generateDailyReport(date) 完全一致（本期=前一天、环比=前两天、同比=去年今天）。
+     * 日期规则与 generateDailyReport(date) 完全一致（本期=前一天、环比=前两天、同比=去年本期就近同周几）。
      *
      * @return 截图 PNG 路径（失败返回 null）
      */
@@ -97,9 +97,21 @@ public class SalesDetail2ReportService {
         req.setEndDate(date.minusDays(1).format(DTF));
         req.setCmpStartDate(date.minusDays(2).format(DTF));
         req.setCmpEndDate(date.minusDays(2).format(DTF));
-        req.setYoyStartDate(date.minusYears(1).format(DTF));
-        req.setYoyEndDate(date.minusYears(1).format(DTF));
+        LocalDate yoyDate = calcYoySameDow(date.minusDays(1));  // 同比 = 去年本期就近同周几
+        req.setYoyStartDate(yoyDate.format(DTF));
+        req.setYoyEndDate(yoyDate.format(DTF));
         return generateDailyReport(req, fileTag, unionStockCodes);
+    }
+
+    /**
+     * 同比日期 = 去年本期的今天（本期−1年），就近取与本期同周几的最近一天。
+     * 例：本期 2026-08-27 周四 → 去年本期 2025-08-27 周三 → 最近周四 = 2025-08-28。
+     * 无平局：偏移 d∈[0,6]，d≤3 往后取，d≥4 往前取。
+     */
+    private LocalDate calcYoySameDow(LocalDate cur) {
+        LocalDate base = cur.minusYears(1);
+        int d = (cur.getDayOfWeek().getValue() - base.getDayOfWeek().getValue() + 7) % 7;
+        return d <= 3 ? base.plusDays(d) : base.minusDays(7 - d);
     }
 
     /**

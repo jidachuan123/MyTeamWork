@@ -36,7 +36,7 @@ import java.util.Map;
  *
  * 🔴 安全红线：引擎只读；本类只写 dw.rpt_sale_detail_precompute / dw.etl_batch_log；幂等删除仅限预计算表自身。
  *
- * 日期规则（与前端一致）：本期 queryDate=跑批日-1；环比对期=queryDate-1（前两天）；同比对期=去年今天。
+ * 日期规则（与前端一致）：本期 queryDate=跑批日-1；环比对期=queryDate-1（前两天）；同比对期=去年本期的今天就近取同周几。
  */
 @Service
 public class SaleDetailPrecomputeService {
@@ -108,7 +108,7 @@ public class SaleDetailPrecomputeService {
 
         List<String> orgs = normalizeOrgs(orgCodes);
         LocalDate momDate = queryDate.minusDays(1);                 // 环比对期 = 前两天
-        LocalDate yoyDate = queryDate.plusDays(1).minusYears(1);    // 同比对期 = 去年今天（与前端一致）
+        LocalDate yoyDate = calcYoySameDow(queryDate);              // 同比对期 = 去年本期就近同周几（与前端一致）
 
         log.info("[预计算] 开始跑批 queryDate={} MOM对期={} YOY对期={} trigger={} 机构={} 档位={}",
                 queryDate, momDate, yoyDate, triggerType, orgs, java.util.Arrays.toString(LEVELS));
@@ -158,7 +158,7 @@ public class SaleDetailPrecomputeService {
         }
 
         LocalDate momDate = queryDate.minusDays(1);                 // 环比对期 = 前两天
-        LocalDate yoyDate = queryDate.plusDays(1).minusYears(1);    // 同比对期 = 去年今天
+        LocalDate yoyDate = calcYoySameDow(queryDate);              // 同比对期 = 去年本期就近同周几
 
         log.info("[预计算] 开始跑批(报表2) queryDate={} MOM对期={} YOY对期={} trigger={} orgCode={}",
                 queryDate, momDate, yoyDate, triggerType, orgCodeCsv);
@@ -179,6 +179,17 @@ public class SaleDetailPrecomputeService {
     }
 
     /** 报表2 一次引擎调用（多机构整体串，deptLevels 留空，部门级明细） */
+    /**
+     * 同比日期 = 去年本期的今天（本期−1年），就近取与本期同周几的最近一天。
+     * 例：本期 2026-08-27 周四 → 去年本期 2025-08-27 周三 → 最近周四 = 2025-08-28。
+     * 无平局：偏移 d∈[0,6]，d≤3 往后取，d≥4 往前取。
+     */
+    private LocalDate calcYoySameDow(LocalDate cur) {
+        LocalDate base = cur.minusYears(1);
+        int d = (cur.getDayOfWeek().getValue() - base.getDayOfWeek().getValue() + 7) % 7;
+        return d <= 3 ? base.plusDays(d) : base.minusDays(7 - d);
+    }
+
     private int runOnceR2(LocalDate queryDate, LocalDate cmpDate, String comparisonType, String triggerType, String orgCodeCsv) {
         String qd = queryDate.format(DTF);
         String cd = cmpDate.format(DTF);
