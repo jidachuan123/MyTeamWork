@@ -63,8 +63,20 @@ public class SalesDetail2ReportService {
      * @return 截图 PNG 路径（失败返回 null）
      */
     public String generateDailyReport(LocalDate date) {
+        return generateDailyReport(date, orgCode2, null);
+    }
+
+    /**
+     * 生成某天销售详情2 截图，机构编码可覆盖、截图文件名可追加标识。
+     * 用于「副邮件/多机构」场景：orgCodeOverride 指定机构（如 1103,1104），
+     * fileTag 追加到 HTML/PNG 文件名（如 -1103-1104），避免同日不同机构截图文件名冲突。
+     * 日期规则与 generateDailyReport(date) 完全一致（本期=前一天、环比=前两天、同比=去年今天）。
+     *
+     * @return 截图 PNG 路径（失败返回 null）
+     */
+    public String generateDailyReport(LocalDate date, String orgCodeOverride, String fileTag) {
         DailyReportParam req = new DailyReportParam();
-        req.setOrgCode(orgCode2);
+        req.setOrgCode(orgCodeOverride);
         req.setDeptLevels("");
         req.setDepartment("");
         req.setStartDate(date.minusDays(1).format(DTF));
@@ -73,7 +85,7 @@ public class SalesDetail2ReportService {
         req.setCmpEndDate(date.minusDays(2).format(DTF));
         req.setYoyStartDate(date.minusYears(1).format(DTF));
         req.setYoyEndDate(date.minusYears(1).format(DTF));
-        return generateDailyReport(req);
+        return generateDailyReport(req, fileTag);
     }
 
     /**
@@ -83,6 +95,16 @@ public class SalesDetail2ReportService {
      * @return 截图 PNG 路径（失败返回 null）
      */
     public String generateDailyReport(DailyReportParam req) {
+        return generateDailyReport(req, null);
+    }
+
+    /**
+     * 按页面查询参数生成销售详情2 截图；fileTag 非空时追加到 HTML/PNG 文件名。
+     * fileTag 用于区分同日不同机构的截图（如 -1103-1104），避免文件名冲突被覆盖。
+     *
+     * @return 截图 PNG 路径（失败返回 null）
+     */
+    public String generateDailyReport(DailyReportParam req, String fileTag) {
         // 报表日期标签：取「本期结束日期」；为空时回退今天
         String today = (req.getEndDate() != null && !req.getEndDate().trim().isEmpty())
                 ? req.getEndDate().trim() : LocalDate.now().format(DTF);
@@ -116,7 +138,8 @@ public class SalesDetail2ReportService {
             log.error("[销售详情2] 创建输出目录失败", e);
             return null;
         }
-        String htmlPath = outputDir + "/sales-detail2-" + today + ".html";
+        String tag = (fileTag != null && !fileTag.trim().isEmpty()) ? "-" + fileTag.trim() : "";
+        String htmlPath = outputDir + "/sales-detail2-" + today + tag + ".html";
         try {
             Files.write(Paths.get(htmlPath), buildHtml(q, m, y, rows).getBytes(StandardCharsets.UTF_8));
             log.info("[销售详情2] HTML 已生成: {}", new File(htmlPath).getAbsolutePath());
@@ -126,7 +149,7 @@ public class SalesDetail2ReportService {
         }
 
         // ===== 4. 截图 =====
-        String pngPath = outputDir + "/sales-detail2-" + today + ".png";
+        String pngPath = outputDir + "/sales-detail2-" + today + tag + ".png";
         boolean shotOk = reportService.screenshot(htmlPath, pngPath, rows.size());
         log.info("[销售详情2] 报表生成完成，共 {} 行数据，截图: {} ({})",
                 rows.size(), pngPath, shotOk ? "成功" : "失败");

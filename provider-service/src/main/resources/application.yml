@@ -46,19 +46,53 @@ eureka:
   instance:
     prefer-ip-address: true
 
-# ===== 销售详情日报（每天早晨 8:15 定时任务）=====
+# ============================================================
+# 销售详情日报 定时任务配置（每天发送，时间见 report.daily.cron）
+#
+# 邮件分两组：main（主邮件）/ secondary（副邮件），每组结构完全一样：
+#   mail-to     收件人邮箱
+#   screenshots 截图列表（想发几张就配几条，顺序即发送顺序）
+#
+# 每张截图 3 个字段：
+#   type      报表类型：sd1=销售详情1，sd2=销售详情2
+#   org-code  机构编码（多个用英文逗号分隔，如 "1101,1102,1191001"）
+#   tag       文件名后缀：同一报表有多张不同机构的截图时必填（否则同名互相覆盖！）
+#             留空则文件名不带后缀；例：tag=1101031 → sales-detail-{日期}-1101031.png
+#
+# ★ 以后加截图：在 main 或 secondary 的 screenshots 下复制一行改三个字段即可，无需改代码
+# ============================================================
 report:
   daily:
-    cron: "0 15 8 * * ?"          # 每天早晨 8:15 触发
-    org-code: "1101001"           # SalesDetail 机构编码（主收件人 1137851593@qq.com 用）
-    org-code2: "1101,1102,1191001" # SalesDetail2 机构编码（巨野组/便利组）
-    org-code-extra: "1103011"     # 第二收件人 591111450@qq.com 专用：销售详情1 截图机构编码
-    org-code-3: "1101031"         # 主收件人第三张截图专用：销售详情1 截图机构编码（orgCode 由 1101001 改为 1101031）
-    mail-to: "1137851593@qq.com"   # 主收件人（销售详情1 + 销售详情2 两张截图）
-    mail-to-2: "386323281@qq.com"  # 第二收件人（仅销售详情1，机构=org-code-extra）
-    mail-from: "591111450@qq.com" # 发件人（需与 spring.mail.username 一致）
-    chrome-path: ""               # 留空则自动探测 Chrome/Edge 路径
+    cron: "0 36 11 * * ?"          # 定时发送时间（cron 表达式）
+    mail-from: "591111450@qq.com"  # 发件人（需与 spring.mail.username 一致）
+    mail-to: "591111450@qq.com"    # 默认收件人兜底（仅手动触发接口用；定时任务收件人看下方 main/secondary）
+    chrome-path: ""                # 留空则自动探测 Chrome/Edge 路径
     output-dir: "C:/work/MyTeamWork/provider-service/target/report"  # HTML/截图输出目录
+
+    # ---------- 主邮件（目前 3 张截图） ----------
+    main:
+      mail-to: "591111450@qq.com"   # 主收件人
+      screenshots:
+        - type: sd1                # 销售详情1（主图）
+          org-code: "1101001"
+          tag: ""                  # 无后缀：sales-detail-{日期}.png
+        - type: sd1                # 销售详情1（第三张，仅机构不同）
+          org-code: "1101031"
+          tag: "1101031"           # sales-detail-{日期}-1101031.png
+        - type: sd2                # 销售详情2
+          org-code: "1101,1102,1191001"
+          tag: ""                  # 无后缀：sales-detail2-{日期}.png
+
+    # ---------- 副邮件（目前 2 张截图） ----------
+    secondary:
+      mail-to: "591111450@qq.com"  # 副收件人
+      screenshots:
+        - type: sd1                # 销售详情1（机构 1103011）
+          org-code: "1103011"
+          tag: "1103011"           # sales-detail-{日期}-1103011.png
+        - type: sd2                # 销售详情2（机构 1103,1104）—— 与主邮件 SD2 同参数，仅机构不同
+          org-code: "1103,1104"
+          tag: "1103-1104"         # sales-detail2-{日期}-1103-1104.png
   # ===== 销售报表1 预计算（每天凌晨 2:00 定时跑批，结果存 dw.rpt_sale_detail_precompute）=====
   precompute:
     cron: "0 0 2 * * ?"           # 每天凌晨 2:00 触发
