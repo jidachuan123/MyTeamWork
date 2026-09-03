@@ -63,7 +63,7 @@ eureka:
 # ============================================================
 report:
   daily:
-    cron: "0 15 8 * * ?"          # 定时发送时间（cron 表达式）
+    cron: "0 32 8 * * ?"          # 定时发送时间（cron 表达式）
     mail-from: "591111450@qq.com"  # 发件人（需与 spring.mail.username 一致）
     mail-to: "591111450@qq.com"    # 默认收件人兜底（仅手动触发接口用；定时任务收件人看下方 main/secondary）
     chrome-path: ""                # 留空则自动探测 Chrome/Edge 路径
