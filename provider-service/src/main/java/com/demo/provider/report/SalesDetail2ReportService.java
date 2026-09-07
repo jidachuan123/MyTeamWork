@@ -465,25 +465,28 @@ public class SalesDetail2ReportService {
           .append(".page{padding:16px 20px 24px;}\n")
           .append(".header{text-align:center;padding:14px 0 12px;border-bottom:1px solid #e8e8e8;background:#fff;}\n")
           .append(".header h2{margin:0 0 8px;font-size:18px;font-weight:700;color:#b71c1c;letter-spacing:1px;}\n")
-          .append(".date{display:inline-block;font-size:12px;padding:3px 10px;border-radius:4px;margin:0 6px;background:#fff;color:#1565c0;font-weight:500;}\n")
-          .append(".date.mom{background:#fff;color:#e65100;}\n")
-          .append(".date.yoy{background:#fff;color:#2e7d32;}\n")
+          .append(".date{display:inline-block;font-size:15px;padding:4px 12px;border-radius:4px;margin:0 6px;background:#fff;color:#d32f2f;font-weight:700;}\n")
+          .append(".date.mom{background:#fff;color:#d32f2f;}\n")
+          .append(".date.yoy{background:#fff;color:#d32f2f;}\n")
           .append("table{width:100%;border-collapse:collapse;margin-top:12px;white-space:nowrap;}\n")
           .append("th{padding:8px 6px;border:2px solid #000;text-align:center;background:#fff;color:#333;font-weight:700;white-space:nowrap;}\n")
-          .append("td{padding:7px 6px;border:1px solid #000;text-align:center;}\n")
+          .append("td{padding:7px 6px;border:1px solid #000;text-align:center;font-size:14px;font-variant-numeric:tabular-nums;}\n")
           .append("tr.odd td{background:#fff;}\n")
           .append(".col-code{text-align:center !important;}\n")
           .append(".col-org{text-align:left !important;padding-left:10px !important;}\n")
-          .append(".col-num{text-align:center !important;font-family:'Segoe UI','Microsoft YaHei',sans-serif;}\n")
-          .append(".y{background:#FFFF00 !important;}\n")
-          .append("tr.subtotal td{background:#fff !important;border-top:2px solid #000;border-bottom:2px solid #000;color:#333;font-weight:700;}\n")
-          .append(".rate-up{color:#d32f2f;font-weight:500;}\n")
-          .append(".rate-down{color:#388e3c;font-weight:500;}\n")
+          .append(".col-num{text-align:center !important;font-family:'Segoe UI','Microsoft YaHei',sans-serif;font-size:15px;font-variant-numeric:tabular-nums;}\n")
+          .append(".y{background:#FFFF00 !important;font-size:15px;font-weight:500;}\n")
+          .append("tr.subtotal td{background:#B8E0DC !important;border-top:2px solid #000;border-bottom:2px solid #000;color:#1a1a1a !important;font-weight:700;}\n")
+          .append("tr.subtotal td.y,tr.subtotal td .rate-num{font-weight:700 !important;}\n")
+          .append(".rate-arrow{display:inline-block;width:1em;text-align:center;}\n")
+          .append(".rate-num{display:inline-block;min-width:4.6em;text-align:right;color:#1a1a1a;}\n")
+          .append("td.rate-up .rate-arrow{color:#2e7d32 !important;font-weight:600;}\n")
+          .append("td.rate-down .rate-arrow{color:#c62828 !important;font-weight:600;}\n")
           .append("</style>\n</head>\n<body>\n<div class=\"page\">\n")
           .append("<div class=\"header\"><h2>各店每月销售详情</h2><div>\n")
-          .append("<span class=\"date\">本期：").append(queryDate).append(" ~ ").append(queryDate).append("</span>\n")
-          .append("<span class=\"date mom\">环比：").append(momDate).append(" ~ ").append(momDate).append("</span>\n")
-          .append("<span class=\"date yoy\">同比：").append(yoyDate).append(" ~ ").append(yoyDate).append("</span>\n")
+          .append("<span class=\"date\">查询日期：").append(queryDate).append(" ~ ").append(queryDate).append("</span>\n")
+          .append("<span class=\"date mom\">环比对比：").append(momDate).append(" ~ ").append(momDate).append("</span>\n")
+          .append("<span class=\"date yoy\">同比对比：").append(yoyDate).append(" ~ ").append(yoyDate).append("</span>\n")
           .append("</div></div>\n");
 
         // 表头（16 列，与前端 SalesDetail2.vue 一致：含当日库存金额）
@@ -553,8 +556,10 @@ public class SalesDetail2ReportService {
     }
 
     private void appendRateTd(StringBuilder sb, String cls, Double v) {
+        // 2026-09-07 移植 SD1：箭头与数值分两段渲染，保证整列对齐
         sb.append("<td class=\"").append(cls).append(' ').append(rateClass(v)).append("\">")
-          .append(fmtRate(v))
+          .append("<span class=\"rate-arrow\">").append(rateArrow(v)).append("</span>")
+          .append("<span class=\"rate-num\">").append(rateText(v)).append("</span>")
           .append("</td>");
     }
 
@@ -565,6 +570,18 @@ public class SalesDetail2ReportService {
     }
 
     private String fmtRate(Double v) {
+        if (v == null) return "";
+        return (v > 0 ? "+" : "") + String.format(Locale.US, "%.2f", v) + "%";
+    }
+
+    /** 增长率箭头（正绿▲ / 负红▼ / 0 与 null 为空） */
+    private String rateArrow(Double v) {
+        if (v == null) return "";
+        return v > 0 ? "▲" : (v < 0 ? "▼" : "");
+    }
+
+    /** 增长率数字文本（不含箭头，黑色） */
+    private String rateText(Double v) {
         if (v == null) return "";
         return (v > 0 ? "+" : "") + String.format(Locale.US, "%.2f", v) + "%";
     }
