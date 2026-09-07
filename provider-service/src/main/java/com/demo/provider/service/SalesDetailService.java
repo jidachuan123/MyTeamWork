@@ -882,7 +882,7 @@ public class SalesDetailService {
                 "                    tb_wb_gdsstock sto ( NOLOCK ) \n" +
                 "                  WHERE\n" +
                 "                       sto.c_store_id not in ('1101951','1103951','1501001','1501031','1101099') \n" +
-                "                       and  sto.c_store_id not like '1106%' \n" +
+//                "                       and  sto.c_store_id not like '1106%' \n" +
                 "                       and sto.c_store_id not like '1108%'\n" +
                 "                       and sto.c_store_id not like '13%'\n" +
                 "                    group by sto.c_store_id\n" +
