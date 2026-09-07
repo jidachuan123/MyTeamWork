@@ -476,6 +476,8 @@ public class SalesDetail2ReportService {
           .append(".col-org{text-align:left !important;padding-left:10px !important;}\n")
           .append(".col-num{text-align:center !important;font-family:'Segoe UI','Microsoft YaHei',sans-serif;font-size:15px;font-variant-numeric:tabular-nums;}\n")
           .append(".y{background:#FFFF00 !important;font-size:15px;font-weight:500;}\n")
+          /* 2026-09-07 八改：普通行数字加粗 600（与页面一致）；合计行由下方 tr.subtotal td 的 700 覆盖 */
+          .append(".col-code,td.c-stock,td.c-sales,td.c-profit,td.c-customer,td.c-price{font-weight:600;}\n")
           .append("tr.subtotal td{background:#B8E0DC !important;border-top:2px solid #000;border-bottom:2px solid #000;color:#1a1a1a !important;font-weight:700;}\n")
           .append("tr.subtotal td.y,tr.subtotal td .rate-num{font-weight:700 !important;}\n")
           .append(".rate-arrow{display:inline-block;width:1em;text-align:center;}\n")
