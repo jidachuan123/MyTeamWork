@@ -494,25 +494,34 @@ public class SalesDailyReportService {
           .append("<title>部门销售详情</title>\n<style>\n")
           .append("body{margin:0;padding:0;background:#fff;font-family:'Microsoft YaHei','Segoe UI',sans-serif;font-size:12px;color:#333;}\n")
           .append(".page{padding:16px 20px 24px;}\n")
-          .append(".header{text-align:center;padding:14px 0 12px;border-bottom:1px solid #e8e8e8;background:linear-gradient(135deg,#fff8e1,#fffde7);}\n")
+          .append(".header{text-align:center;padding:14px 0 12px;border-bottom:1px solid #e8e8e8;background:#fff;}\n")
           .append(".header h2{margin:0 0 8px;font-size:18px;font-weight:700;color:#b71c1c;letter-spacing:1px;}\n")
-          .append(".date{display:inline-block;font-size:12px;padding:3px 10px;border-radius:4px;margin:0 6px;background:#e3f2fd;color:#1565c0;font-weight:500;}\n")
-          .append(".date.mom{background:#fff3e0;color:#e65100;}\n")
-          .append(".date.yoy{background:#e8f5e9;color:#2e7d32;}\n")
+          .append(".date{display:inline-block;font-size:15px;padding:4px 12px;border-radius:4px;margin:0 6px;background:#fff;color:#d32f2f;font-weight:700;}\n")
+          .append(".date.mom{background:#fff;color:#d32f2f;font-weight:700;}\n")
+          .append(".date.yoy{background:#fff;color:#d32f2f;font-weight:700;}\n")
           .append("table{width:100%;border-collapse:collapse;margin-top:12px;white-space:nowrap;}\n")
-          .append("th{padding:8px 6px;border:2px solid #8c8c8c;text-align:center;background:#f5f5f5;color:#333;font-weight:600;}\n")
-          .append("td{padding:7px 6px;border:1.5px solid #bfbfbf;text-align:center;}\n")
-          .append("tr.odd td{background:#fafafa;}\n")
+          .append("th{padding:7px 4px;border:2px solid #000;text-align:center;background:#fff;color:#333;font-weight:700;font-size:13px;}\n")
+          // 2026-09-07 二改：padding 收紧（7px 6px → 5px 3px）+ 字号 13→14px，单元格尺寸不变大
+          .append("td{padding:5px 3px;border:1px solid #000;text-align:center;font-size:14px;font-variant-numeric:tabular-nums;line-height:1.25;}\n")
+          .append("tr.odd td{background:#fff;}\n")
           .append(".col-name{text-align:left !important;padding-left:10px !important;}\n")
           .append(".col-merge{text-align:center !important;font-weight:700;font-size:14px;letter-spacing:2px;}\n")
-          .append(".c-sales{background:#fff3e0 !important;}\n")
-          .append(".c-profit{background:#e8f5e9 !important;}\n")
-          .append(".c-customer{background:#e3f2fd !important;}\n")
-          .append(".c-price{background:#fce4ec !important;}\n")
-          .append("tr.subtotal td{background:linear-gradient(90deg,#fff59d,#fff9c4);border-top:2px solid #f57f17;border-bottom:2px solid #f57f17;color:#4e342e;font-weight:700;}\n")
-          .append("tr.total td{background:linear-gradient(90deg,#ffd54f,#ffca28);border-top:2px solid #e65100;border-bottom:3px double #bf360c;color:#3e2723;font-weight:800;}\n")
-          .append(".rate-up{color:#d32f2f;font-weight:500;}\n")
-          .append(".rate-down{color:#388e3c;font-weight:500;}\n")
+          .append(".y{background:#FFFF00 !important;font-size:15px;font-weight:500;}\n")
+          .append("tr.subtotal td{background:#B8E0DC !important;border-top:2px solid #000;border-bottom:2px solid #000;color:#1a1a1a !important;font-weight:700;}\n")
+          // 2026-09-07 四改：总计行暗黄 #D9B046 调淡为 #F2E1A6
+          .append("tr.total td{background:#F2E1A6 !important;border-top:2px solid #000;border-bottom:3px double #000;color:#1a1a1a !important;font-weight:800;}\n")
+          // 2026-09-07 五改：仅箭头保留红/绿色；增长率数字统一黑色
+          .append("td.rate-up .rate-arrow{color:#2e7d32 !important;font-weight:600;}\n")
+          .append("td.rate-up .rate-num{color:#1a1a1a;font-weight:600;}\n")
+          .append("td.rate-down .rate-arrow{color:#c62828 !important;font-weight:600;}\n")
+          .append("td.rate-down .rate-num{color:#1a1a1a;font-weight:600;}\n")
+          // 2026-09-07 六改：合计行/总计行 数字加粗——覆盖 .y 的 font-weight:500，
+          // 否则数字单元格仍是中等字重（仅标签加粗，数字没加粗）
+          .append("tr.subtotal td.y,tr.subtotal td .rate-num{font-weight:700 !important;}\n")
+          .append("tr.total td.y,tr.total td .rate-num{font-weight:800 !important;}\n")
+          // 增长率对齐（2026-09-07）：固定宽箭头 + 等宽右对齐数值，3 位/4 位数整列对齐
+          .append(".rate-arrow{display:inline-block;width:1em;text-align:center;}\n")
+          .append(".rate-num{display:inline-block;min-width:4.6em;text-align:right;}\n")
           .append("</style>\n</head>\n<body>\n<div class=\"page\">\n")
           .append("<div class=\"header\"><h2>部门销售详情</h2><div>\n")
           .append("<span class=\"date\">查询日期：").append(queryDate).append(" ~ ").append(queryDate).append("</span>\n")
@@ -523,10 +532,10 @@ public class SalesDailyReportService {
         // 表头（与前端页面 17 列一致）
         sb.append("<table>\n<thead><tr>")
           .append("<th>机构名称</th><th>部组名称</th><th>部门编码</th><th>部门名称</th>")
-          .append("<th class=\"c-sales\">销售额/元</th><th class=\"c-sales\">同比销售额增长率</th><th class=\"c-sales\">环比销售额增长率</th>")
-          .append("<th class=\"c-profit\">毛利额/元</th><th class=\"c-profit\">同比毛利额增长率</th><th class=\"c-profit\">环比毛利额增长率</th>")
-          .append("<th class=\"c-profit\">毛利率</th><th class=\"c-customer\">来客数</th><th class=\"c-customer\">同比来客数增长率</th><th class=\"c-customer\">环比来客数增长率</th>")
-          .append("<th class=\"c-price\">客单价/元</th><th class=\"c-price\">同比客单价增长率</th><th class=\"c-price\">环比客单价增长率</th>")
+          .append("<th class=\"c-sales y\">销售额/元</th><th class=\"c-sales\">同比销售额增长率</th><th class=\"c-sales\">环比销售额增长率</th>")
+          .append("<th class=\"c-profit y\">毛利额/元</th><th class=\"c-profit\">同比毛利额增长率</th><th class=\"c-profit\">环比毛利额增长率</th>")
+          .append("<th class=\"c-profit y\">毛利率</th><th class=\"c-customer y\">来客数</th><th class=\"c-customer\">同比来客数增长率</th><th class=\"c-customer\">环比来客数增长率</th>")
+          .append("<th class=\"c-price y\">客单价/元</th><th class=\"c-price\">同比客单价增长率</th><th class=\"c-price\">环比客单价增长率</th>")
           .append("</tr></thead>\n<tbody>\n");
 
         int idx = 0;
@@ -563,19 +572,21 @@ public class SalesDailyReportService {
     }
 
     private void appendNumTd(StringBuilder sb, String cls, Double v) {
-        sb.append("<td class=\"").append(cls).append("\">")
+        sb.append("<td class=\"").append(cls).append(" y\">")
           .append(v == null ? "" : String.format(Locale.US, "%,.2f", v))
           .append("</td>");
     }
 
     private void appendRateTd(StringBuilder sb, String cls, Double v) {
+        // 2026-09-07：箭头与数值分两段渲染，保证整列对齐
         sb.append("<td class=\"").append(cls).append(' ').append(rateClass(v)).append("\">")
-          .append(fmtRate(v))
+          .append("<span class=\"rate-arrow\">").append(rateArrow(v)).append("</span>")
+          .append("<span class=\"rate-num\">").append(rateText(v)).append("</span>")
           .append("</td>");
     }
 
     private void appendPctTd(StringBuilder sb, String cls, Double v) {
-        sb.append("<td class=\"").append(cls).append(' ').append(rateClass(v)).append("\">")
+        sb.append("<td class=\"").append(cls).append(" y ").append(rateClass(v)).append("\">")
           .append(v == null ? "" : v + "%")
           .append("</td>");
     }
@@ -584,7 +595,32 @@ public class SalesDailyReportService {
         if (v == null) {
             return "";
         }
-        return (v > 0 ? "+" : "") + String.format(Locale.US, "%.2f", v) + "%";
+        String arrow = v > 0 ? "▲ " : (v < 0 ? "▼ " : "");
+        String prefix = v > 0 ? "+" : "";
+        return arrow + prefix + String.format(Locale.US, "%.2f", v) + "%";
+    }
+
+    /** 增长率箭头（正负分绿▲/红▼，0 与 null 为空） */
+    private String rateArrow(Double v) {
+        if (v == null) {
+            return "";
+        }
+        if (v > 0) {
+            return "▲";
+        }
+        if (v < 0) {
+            return "▼";
+        }
+        return "";
+    }
+
+    /** 增长率数值文本（带正负号，2 位小数 + %），不含箭头 */
+    private String rateText(Double v) {
+        if (v == null) {
+            return "";
+        }
+        String prefix = v > 0 ? "+" : "";
+        return prefix + String.format(Locale.US, "%.2f", v) + "%";
     }
 
     private String rateClass(Double v) {

@@ -463,24 +463,20 @@ public class SalesDetail2ReportService {
           .append("<title>各店每月销售详情</title>\n<style>\n")
           .append("body{margin:0;padding:0;background:#fff;font-family:'Microsoft YaHei','Segoe UI',sans-serif;font-size:12px;color:#333;}\n")
           .append(".page{padding:16px 20px 24px;}\n")
-          .append(".header{text-align:center;padding:14px 0 12px;border-bottom:1px solid #e8e8e8;background:linear-gradient(135deg,#fff8e1,#fffde7);}\n")
+          .append(".header{text-align:center;padding:14px 0 12px;border-bottom:1px solid #e8e8e8;background:#fff;}\n")
           .append(".header h2{margin:0 0 8px;font-size:18px;font-weight:700;color:#b71c1c;letter-spacing:1px;}\n")
-          .append(".date{display:inline-block;font-size:12px;padding:3px 10px;border-radius:4px;margin:0 6px;background:#e3f2fd;color:#1565c0;font-weight:500;}\n")
-          .append(".date.mom{background:#fff3e0;color:#e65100;}\n")
-          .append(".date.yoy{background:#e8f5e9;color:#2e7d32;}\n")
+          .append(".date{display:inline-block;font-size:12px;padding:3px 10px;border-radius:4px;margin:0 6px;background:#fff;color:#1565c0;font-weight:500;}\n")
+          .append(".date.mom{background:#fff;color:#e65100;}\n")
+          .append(".date.yoy{background:#fff;color:#2e7d32;}\n")
           .append("table{width:100%;border-collapse:collapse;margin-top:12px;white-space:nowrap;}\n")
-          .append("th{padding:8px 6px;border:2px solid #8c8c8c;text-align:center;background:#f5f5f5;color:#333;font-weight:600;white-space:nowrap;}\n")
-          .append("td{padding:7px 6px;border:1.5px solid #bfbfbf;text-align:center;}\n")
-          .append("tr.odd td{background:#fafafa;}\n")
+          .append("th{padding:8px 6px;border:2px solid #000;text-align:center;background:#fff;color:#333;font-weight:700;white-space:nowrap;}\n")
+          .append("td{padding:7px 6px;border:1px solid #000;text-align:center;}\n")
+          .append("tr.odd td{background:#fff;}\n")
           .append(".col-code{text-align:center !important;}\n")
           .append(".col-org{text-align:left !important;padding-left:10px !important;}\n")
           .append(".col-num{text-align:center !important;font-family:'Segoe UI','Microsoft YaHei',sans-serif;}\n")
-          .append(".c-sales{background:#fff3e0 !important;}\n")
-          .append(".c-profit{background:#e8f5e9 !important;}\n")
-          .append(".c-customer{background:#e3f2fd !important;}\n")
-          .append(".c-price{background:#fce4ec !important;}\n")
-          .append(".c-stock{background:#f3e5f5 !important;}\n")
-          .append("tr.subtotal td{background:linear-gradient(90deg,#fff59d,#fff9c4);border-top:2px solid #f57f17;border-bottom:2px solid #f57f17;color:#4e342e;font-weight:700;}\n")
+          .append(".y{background:#FFFF00 !important;}\n")
+          .append("tr.subtotal td{background:#fff !important;border-top:2px solid #000;border-bottom:2px solid #000;color:#333;font-weight:700;}\n")
           .append(".rate-up{color:#d32f2f;font-weight:500;}\n")
           .append(".rate-down{color:#388e3c;font-weight:500;}\n")
           .append("</style>\n</head>\n<body>\n<div class=\"page\">\n")
@@ -493,11 +489,11 @@ public class SalesDetail2ReportService {
         // 表头（16 列，与前端 SalesDetail2.vue 一致：含当日库存金额）
         sb.append("<table>\n<thead><tr>")
           .append("<th>机构代码</th><th>机构名称</th><th class=\"c-stock\">当日库存金额</th>")
-          .append("<th class=\"c-sales\">销售额/元</th><th class=\"c-sales\">同比<br>销售额增长率</th><th class=\"c-sales\">环比<br>销售额增长率</th>")
-          .append("<th class=\"c-profit\">毛利额/元</th><th class=\"c-profit\">同比<br>毛利额增长率</th><th class=\"c-profit\">环比<br>毛利额增长率</th>")
-          .append("<th class=\"c-profit\">毛利率</th>")
-          .append("<th class=\"c-customer\">来客数</th><th class=\"c-customer\">同比<br>来客数增长率</th><th class=\"c-customer\">环比<br>来客数增长率</th>")
-          .append("<th class=\"c-price\">客单价/元</th><th class=\"c-price\">同比<br>客单价增长率</th><th class=\"c-price\">环比<br>客单价增长率</th>")
+          .append("<th class=\"c-sales y\">销售额/元</th><th class=\"c-sales\">同比<br>销售额增长率</th><th class=\"c-sales\">环比<br>销售额增长率</th>")
+          .append("<th class=\"c-profit y\">毛利额/元</th><th class=\"c-profit\">同比<br>毛利额增长率</th><th class=\"c-profit\">环比<br>毛利额增长率</th>")
+          .append("<th class=\"c-profit y\">毛利率</th>")
+          .append("<th class=\"c-customer y\">来客数</th><th class=\"c-customer\">同比<br>来客数增长率</th><th class=\"c-customer\">环比<br>来客数增长率</th>")
+          .append("<th class=\"c-price y\">客单价/元</th><th class=\"c-price\">同比<br>客单价增长率</th><th class=\"c-price\">环比<br>客单价增长率</th>")
           .append("</tr></thead>\n<tbody>\n");
 
         int idx = 0;
@@ -517,24 +513,24 @@ public class SalesDetail2ReportService {
             // 当日库存金额
             appendNumTd(sb, "c-stock", r.stockAmount);
             // 销售额
-            appendNumTd(sb, "c-sales", r.sales);
+            appendNumTd(sb, "c-sales y", r.sales);
             // 同比/环比 销售额增长率
             appendRateTd(sb, "c-sales", r.yoySalesRate);
             appendRateTd(sb, "c-sales", r.momSalesRate);
             // 毛利额
-            appendNumTd(sb, "c-profit", r.profit);
+            appendNumTd(sb, "c-profit y", r.profit);
             // 同比/环比 毛利额增长率
             appendRateTd(sb, "c-profit", r.yoyProfitRate);
             appendRateTd(sb, "c-profit", r.momProfitRate);
             // 毛利率
-            appendPctTd(sb, "c-profit", r.profitRate);
+            appendPctTd(sb, "c-profit y", r.profitRate);
             // 来客数
-            appendIntTd(sb, "c-customer", r.customers);
+            appendIntTd(sb, "c-customer y", r.customers);
             // 同比/环比 来客数增长率
             appendRateTd(sb, "c-customer", r.yoyCustomerRate);
             appendRateTd(sb, "c-customer", r.momCustomerRate);
             // 客单价
-            appendNumTd(sb, "c-price", r.avgPrice);
+            appendNumTd(sb, "c-price y", r.avgPrice);
             // 同比/环比 客单价增长率
             appendRateTd(sb, "c-price", r.yoyAvgPriceRate);
             appendRateTd(sb, "c-price", r.momAvgPriceRate);
