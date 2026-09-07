@@ -347,10 +347,16 @@ public class SalesDetail2ReportService {
         return result;
     }
 
-    /** 机构分组：按机构编码前四位归类（1101/1102/1103/1104…，前四位相同即同组）。与前端 SalesDetail2.vue 同源 */
+    /** 机构分组归并特例：前四位前缀 → 归入组（2026-09-07：1106 门店并入 1104 组，与前端 SalesDetail2.vue 同源） */
+    private static final Map<String, String> ORG_GROUP_OVERRIDE = Collections.unmodifiableMap(new HashMap<String, String>() {{
+        put("1106", "1104");
+    }});
+
+    /** 机构分组：按机构编码前四位归类（1101/1102/1103/1104…，前四位相同即同组；特例按 ORG_GROUP_OVERRIDE 归并）。与前端 SalesDetail2.vue 同源 */
     private String getGroup(String code) {
         if (code == null) return "其他";
-        return code.length() >= 4 ? code.substring(0, 4) : code;
+        String p = code.length() >= 4 ? code.substring(0, 4) : code;
+        return ORG_GROUP_OVERRIDE.getOrDefault(p, p);
     }
 
     /** 合计行：金额求和，派生指标按合计值公式计算。合计行统一只叫「合计」（不带组名前缀） */
