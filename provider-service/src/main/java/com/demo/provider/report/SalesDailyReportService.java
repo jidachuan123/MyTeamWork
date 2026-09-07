@@ -169,7 +169,9 @@ public class SalesDailyReportService {
         String tag = (fileTag != null && !fileTag.trim().isEmpty()) ? "-" + fileTag.trim() : "";
         String htmlPath = outputDir + "/sales-detail-" + today + tag + ".html";
         try {
-            Files.write(Paths.get(htmlPath), buildHtml(q, m, y, rows).getBytes(StandardCharsets.UTF_8));
+            // 报表标题 = 本期查询区间日期 + 查询结果首机构名 + 销售详情（2026-09-07 与前端页面一致）
+            String title = buildTitle(q, end, rows);
+            Files.write(Paths.get(htmlPath), buildHtml(title, q, end, m, y, rows).getBytes(StandardCharsets.UTF_8));
             log.info("[销售日报] HTML 已生成: {}", new File(htmlPath).getAbsolutePath());
         } catch (Exception e) {
             return "生成 HTML 报表失败: " + e.getMessage();
@@ -488,7 +490,76 @@ public class SalesDailyReportService {
 
     // ==================== HTML 生成 ====================
 
-    private String buildHtml(String queryDate, String momDate, String yoyDate, List<Row> rows) {
+    /** 报表标题 = 本期区间日期 + 查询结果首机构名 + 销售详情（2026-09-07 与前端一致） */
+    private String buildTitle(String start, String end, List<Row> rows) {
+        StringBuilder t = new StringBuilder();
+        String d = fmtTitleDateRange(start, end);
+        if (!d.isEmpty()) {
+            t.append(d).append(' ');
+        }
+        String org = firstOrgName(rows);
+        if (!org.isEmpty()) {
+            t.append(org).append(' ');
+        }
+        t.append("销售详情");
+        return t.toString();
+    }
+
+    /** 取查询结果中第一个非空机构名称（标题用；查询多机构时取第一个） */
+    private String firstOrgName(List<Row> rows) {
+        if (rows == null) {
+            return "";
+        }
+        for (Row r : rows) {
+            if (r.orgName != null && !r.orgName.trim().isEmpty()) {
+                return r.orgName.trim();
+            }
+        }
+        return "";
+    }
+
+    /** '2026-09-06' → '2026年9月6号'（不带前导零；无法解析时原样返回） */
+    private String fmtCnDate(String s) {
+        if (s == null || s.trim().isEmpty()) {
+            return "";
+        }
+        String t = s.trim();
+        String[] p = t.split("-");
+        if (p.length < 3) {
+            return t;
+        }
+        try {
+            return p[0] + "年" + Integer.parseInt(p[1]) + "月" + Integer.parseInt(p[2]) + "号";
+        } catch (NumberFormatException e) {
+            return t;
+        }
+    }
+
+    /** 标题日期段：单日显示一天；跨日同年同月压缩为「2026年9月5号~9月6号」 */
+    private String fmtTitleDateRange(String start, String end) {
+        String a = fmtCnDate(start);
+        String b = fmtCnDate(end);
+        if (a.isEmpty()) {
+            return b;
+        }
+        if (b.isEmpty() || a.equals(b)) {
+            return a;
+        }
+        String[] ps = (start == null ? "" : start.trim()).split("-");
+        String[] pe = (end == null ? "" : end.trim()).split("-");
+        if (ps.length == 3 && pe.length == 3 && ps[0].equals(pe[0])) {
+            if (ps[1].equals(pe[1])) {
+                return ps[0] + "年" + Integer.parseInt(ps[1]) + "月" + Integer.parseInt(ps[2]) + "号~"
+                        + Integer.parseInt(pe[2]) + "号";
+            }
+            return ps[0] + "年" + Integer.parseInt(ps[1]) + "月" + Integer.parseInt(ps[2]) + "号~"
+                    + Integer.parseInt(pe[1]) + "月" + Integer.parseInt(pe[2]) + "号";
+        }
+        return a + "~" + b;
+    }
+
+    private String buildHtml(String title, String queryStart, String queryEnd,
+                             String momDate, String yoyDate, List<Row> rows) {
         StringBuilder sb = new StringBuilder(8192);
         sb.append("<!DOCTYPE html>\n<html lang=\"zh-CN\">\n<head>\n<meta charset=\"UTF-8\">\n")
           .append("<title>部门销售详情</title>\n<style>\n")
@@ -523,8 +594,8 @@ public class SalesDailyReportService {
           .append(".rate-arrow{display:inline-block;width:1em;text-align:center;}\n")
           .append(".rate-num{display:inline-block;min-width:4.6em;text-align:right;}\n")
           .append("</style>\n</head>\n<body>\n<div class=\"page\">\n")
-          .append("<div class=\"header\"><h2>部门销售详情</h2><div>\n")
-          .append("<span class=\"date\">查询日期：").append(queryDate).append(" ~ ").append(queryDate).append("</span>\n")
+          .append("<div class=\"header\"><h2>").append(esc(title)).append("</h2><div>\n")
+          .append("<span class=\"date\">查询日期：").append(queryStart).append(" ~ ").append(queryEnd).append("</span>\n")
           .append("<span class=\"date mom\">环比对比：").append(momDate).append(" ~ ").append(momDate).append("</span>\n")
           .append("<span class=\"date yoy\">同比对比：").append(yoyDate).append(" ~ ").append(yoyDate).append("</span>\n")
           .append("</div></div>\n");
