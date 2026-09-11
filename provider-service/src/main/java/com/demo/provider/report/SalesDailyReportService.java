@@ -10,6 +10,8 @@ import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 
 import javax.mail.internet.MimeMessage;
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.InputStream;
@@ -777,6 +779,12 @@ public class SalesDailyReportService {
                 }
                 Thread.sleep(500);
             }
+            if (ok) {
+                // 2026-09-11：截图高度是按行数估算的（300+行数×30），样式改版后实际内容
+                // 偏矮，视口多余部分显示为底部大片白底（用户反馈）。PNG 生成后自动从底部
+                // 裁掉纯白区域（留 12px 余量），从此不受行高/头部高度变化影响。
+                trimBottomWhitespace(png.getAbsolutePath());
+            }
             long elapsed = System.currentTimeMillis() - start;
             log.info("[销售日报] 截图结果: exists={}, size={}, 耗时: {}ms",
                     png.exists(), png.length(), elapsed);
@@ -797,6 +805,49 @@ public class SalesDailyReportService {
                 } catch (Exception ignored) {
                 }
             }
+        }
+    }
+
+    /**
+     * 2026-09-11：从 PNG 底部向上扫描，裁掉纯白（>=245 灰度）的空白区域，保留 12px 余量。
+     * 解决截图视口高度（按行数估算）大于实际内容高度时，底部出现大片白底的问题。
+     * 采样步长 3px + 只处理底部区域，性能开销可忽略；任何异常都只记日志不阻断主流程。
+     */
+    private void trimBottomWhitespace(String pngPath) {
+        try {
+            File f = new File(pngPath);
+            BufferedImage img = ImageIO.read(f);
+            if (img == null) {
+                log.warn("[销售日报] 底部裁白：PNG 读取失败，跳过 {}", pngPath);
+                return;
+            }
+            int w = img.getWidth();
+            int h = img.getHeight();
+            int cut = h;
+            for (int y = h - 1; y >= 0; y--) {
+                boolean nonWhite = false;
+                for (int x = 0; x < w; x += 3) {
+                    int rgb = img.getRGB(x, y);
+                    int r = (rgb >> 16) & 0xff;
+                    int g = (rgb >> 8) & 0xff;
+                    int b = rgb & 0xff;
+                    if (r < 245 || g < 245 || b < 245) {
+                        nonWhite = true;
+                        break;
+                    }
+                }
+                if (nonWhite) {
+                    cut = Math.min(h, y + 1 + 12); // 内容最后一行 + 12px 余量
+                    break;
+                }
+            }
+            if (cut < h - 5) {
+                BufferedImage out = img.getSubimage(0, 0, w, cut);
+                ImageIO.write(out, "png", f);
+                log.info("[销售日报] 底部裁白: {}px -> {}px（裁掉 {}px 空白）", h, cut, h - cut);
+            }
+        } catch (Exception e) {
+            log.warn("[销售日报] 底部裁白失败（不影响截图）: {}", e.getMessage());
         }
     }
 
