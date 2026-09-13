@@ -44,6 +44,10 @@ public class SalesDetail2ReportService {
     @Value("${report.daily.output-dir:target/report}")
     private String outputDir;
 
+    /** 机构过滤：这些机构在截图中被剔除（不参与展示、不参与合计）。yml 配置 report.daily.exclude-org-codes */
+    @Value("${report.daily.exclude-org-codes:}")
+    private String excludeOrgCodes;
+
     private static final Logger log = LoggerFactory.getLogger(SalesDetail2ReportService.class);
 
     // 固定查询参数
@@ -172,6 +176,11 @@ public class SalesDetail2ReportService {
             mergeStockOnlyRows(momData, yoyData, unionStockCodes);
         }
 
+        // ===== 1.8 机构过滤：剔除配置中指定的机构（不参与展示、不参与合计）=====
+        // 放在 mergeStockOnlyRows 之后，确保 exclude 的机构即使被 UNION ALL 追加也会被剔除。
+        filterExcludeOrgs(momData);
+        filterExcludeOrgs(yoyData);
+
         // ===== 2. 组装表格行 =====
         List<StoreRow> rows = buildRows(momData, yoyData);
 
@@ -201,6 +210,32 @@ public class SalesDetail2ReportService {
     }
 
     // ==================== 查询 ====================
+
+    /**
+     * 按机构编码过滤：剔除 report.daily.exclude-org-codes 配置中指定的机构行。
+     * 配置为空时不过滤。机构编码取 Map 中 key="机构编码" 的值。
+     * 复用 SalesDetailService.filterExcludeOrgs 的过滤逻辑（同一配置、同一行为）。
+     */
+    private void filterExcludeOrgs(List<Map<String, Object>> rows) {
+        if (excludeOrgCodes == null || excludeOrgCodes.trim().isEmpty() || rows == null || rows.isEmpty()) {
+            return;
+        }
+        Set<String> excludeSet = new HashSet<>();
+        for (String code : excludeOrgCodes.split(",")) {
+            String c = code.trim();
+            if (!c.isEmpty()) excludeSet.add(c);
+        }
+        if (excludeSet.isEmpty()) return;
+        int before = rows.size();
+        rows.removeIf(r -> {
+            Object code = r.get("机构编码");
+            return code != null && excludeSet.contains(String.valueOf(code).trim());
+        });
+        int removed = before - rows.size();
+        if (removed > 0) {
+            log.info("[销售详情2-机构过滤] 剔除 {} 行（配置 exclude-org-codes={}）", removed, excludeOrgCodes.trim());
+        }
+    }
 
     private List<Map<String, Object>> query(String startDate, String endDate,
                                             String cmpStartDate, String cmpEndDate,

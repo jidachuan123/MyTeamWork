@@ -63,11 +63,15 @@ eureka:
 # ============================================================
 report:
   daily:
-    cron: "0 32 8 * * ?"          # 定时发送时间（cron 表达式）
+    cron: "0 32 8 * * ?"          # 定时发送时间（cron 表达式，每天上午 10:40）
     mail-from: "591111450@qq.com"  # 发件人（需与 spring.mail.username 一致）
     mail-to: "591111450@qq.com"    # 默认收件人兜底（仅手动触发接口用；定时任务收件人看下方 main/secondary）
     chrome-path: ""                # 留空则自动探测 Chrome/Edge 路径
     output-dir: "C:/work/MyTeamWork/provider-service/target/report"  # HTML/截图输出目录
+    # ---------- 机构过滤（查询+截图共用） ----------
+    # 逗号分隔的机构编码，这些机构在 SD2 查询结果和截图中都会被过滤掉（不参与展示、不参与合计）。
+    # 留空或注释掉 = 不过滤。示例：exclude-org-codes: "1101901,1101911,1191201"
+    exclude-org-codes: "1101901,1101911,1191201"
 
     # ---------- 主邮件（目前 3 张截图） ----------
     main:

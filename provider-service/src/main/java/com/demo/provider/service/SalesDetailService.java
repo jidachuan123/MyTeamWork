@@ -4,6 +4,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import javax.sql.DataSource;
@@ -28,6 +29,10 @@ public class SalesDetailService {
     @Autowired
     @Qualifier("scDataSource")
     private DataSource scDataSource;
+
+    /** 机构过滤：这些机构在查询结果中被剔除（不参与展示、不参与合计）。yml 配置 report.daily.exclude-org-codes */
+    @Value("${report.daily.exclude-org-codes:}")
+    private String excludeOrgCodes;
 
     /**
      * 销售详情查询
@@ -97,7 +102,35 @@ public class SalesDetailService {
             throw new RuntimeException("销售详情查询失败: " + e.getMessage(), e);
         }
 
+        // 机构过滤：剔除配置中指定的机构（不参与展示、不参与合计）
+        filterExcludeOrgs(results);
+
         return results;
+    }
+
+    /**
+     * 按机构编码过滤：剔除 report.daily.exclude-org-codes 配置中指定的机构行。
+     * 配置为空时不过滤。机构编码取 Map 中 key="机构编码" 的值。
+     */
+    public void filterExcludeOrgs(List<Map<String, Object>> rows) {
+        if (excludeOrgCodes == null || excludeOrgCodes.trim().isEmpty() || rows == null || rows.isEmpty()) {
+            return;
+        }
+        Set<String> excludeSet = new HashSet<>();
+        for (String code : excludeOrgCodes.split(",")) {
+            String c = code.trim();
+            if (!c.isEmpty()) excludeSet.add(c);
+        }
+        if (excludeSet.isEmpty()) return;
+        int before = rows.size();
+        rows.removeIf(r -> {
+            Object code = r.get("机构编码");
+            return code != null && excludeSet.contains(String.valueOf(code).trim());
+        });
+        int removed = before - rows.size();
+        if (removed > 0) {
+            log.info("[机构过滤] 剔除 {} 行（配置 exclude-org-codes={}）", removed, excludeOrgCodes.trim());
+        }
     }
 
     /**
