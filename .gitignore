@@ -1,14 +1,17 @@
 # 忽略所有模块下的target编译目录
 target/
+deploy/
 .idea/
 # maven target
 target/
 **/target/
+**/deploy/
 
 
 
 # 忽略logs整个目录
 logs/
+deploy/
 
 # 额外推荐Java项目通用忽略（一并加上）
 *.class
