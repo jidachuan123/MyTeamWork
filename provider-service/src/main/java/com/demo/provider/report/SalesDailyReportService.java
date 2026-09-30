@@ -24,6 +24,7 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -212,6 +213,17 @@ public class SalesDailyReportService {
     private List<Row> buildRows(List<Map<String, Object>> detail, List<Map<String, Object>> detailYoY,
                                 List<Map<String, Object>> lv2, List<Map<String, Object>> lv1,
                                 List<Map<String, Object>> lv2YoY, List<Map<String, Object>> lv1YoY) {
+        // ===== 跨天聚合（2026-09-30 新增，与前端 SalesDetail.vue / 对照页 sales-report1.html 同源）=====
+        // 引擎 dm.up_GetFine_Run 在日期区间查询时按「天 × 部门」逐日返回行：
+        // 同一天查询每部门只有一行（旧行为不变）；跨天时同一部门出现多行（每天一行），
+        // 必须按部门聚合后再组装，否则明细重复、合计行 findRow 只取到第一天。
+        detail    = aggregateRowsByKey(detail,    "部门编码3", "部门编码2");
+        detailYoY = aggregateRowsByKey(detailYoY, "部门编码3", "部门编码2");
+        lv2       = aggregateRowsByKey(lv2,       "部门名称2", "部门编码2");
+        lv2YoY    = aggregateRowsByKey(lv2YoY,    "部门名称2", "部门编码2");
+        lv1       = aggregateRowsByKey(lv1,       "部门名称1", "机构编码");
+        lv1YoY    = aggregateRowsByKey(lv1YoY,    "部门名称1", "机构编码");
+
         // 同比数据按「部门编码3」映射（与前端 yoyByCode 一致）
         Map<String, Map<String, Object>> yoyByCode = new HashMap<>();
         for (Map<String, Object> r : detailYoY) {
@@ -284,6 +296,89 @@ public class SalesDailyReportService {
         total.total = true;
         result.add(total);
         return result;
+    }
+
+    // ==================== 跨天聚合（2026-09-30 新增，与前端/对照页同源）====================
+
+    /** 跨天聚合时可加总的字段：本期三项 + 对期三项（率类字段由聚合值重算，禁止直接相加/平均） */
+    private static final String[] SUM_FIELDS = {
+            "销售金额", "含税毛利", "交易笔数",
+            "对期销售金额", "对期含税毛利", "对期交易笔数"
+    };
+
+    /**
+     * 按 keyFields（依次兜底取第一个非空字段）聚合引擎逐日返回的行。
+     * 同一键多行时：SUM_FIELDS 求和 + recalcRowRates 重算率类字段；
+     * 每键仅一行（单日查询）时原样返回，与旧版行为完全一致；键全部缺失时放弃聚合（保险）。
+     */
+    private List<Map<String, Object>> aggregateRowsByKey(List<Map<String, Object>> rows, String... keyFields) {
+        if (rows == null || rows.size() <= 1) {
+            return rows;
+        }
+        LinkedHashMap<String, Map<String, Object>> map = new LinkedHashMap<>();
+        Map<String, Integer> cnt = new HashMap<>();
+        for (Map<String, Object> r : rows) {
+            String key = null;
+            for (String f : keyFields) {
+                Object v = r.get(f);
+                if (v != null && !String.valueOf(v).trim().isEmpty()) {
+                    key = String.valueOf(v).trim();
+                    break;
+                }
+            }
+            if (key == null) {
+                return rows; // 键缺失 → 放弃聚合，保持原样（保险）
+            }
+            Map<String, Object> t = map.get(key);
+            if (t == null) {
+                map.put(key, r);
+                cnt.put(key, 1);
+            } else {
+                for (String f : SUM_FIELDS) {
+                    Double a = num(t.get(f));
+                    Double b = num(r.get(f));
+                    t.put(f, (a == null ? 0 : a) + (b == null ? 0 : b));
+                }
+                cnt.merge(key, 1, Integer::sum);
+            }
+        }
+        if (map.size() == rows.size()) {
+            return rows; // 没有重复键（单日查询）→ 原样返回
+        }
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (Map.Entry<String, Map<String, Object>> e : map.entrySet()) {
+            Map<String, Object> t = e.getValue();
+            if (cnt.get(e.getKey()) > 1) {
+                recalcRowRates(t);
+            }
+            out.add(t);
+        }
+        return out;
+    }
+
+    /** 聚合后重算率类字段：增长率 = (Σ本期−Σ对期)/|Σ对期|，毛利率/客单价由合计值重算 */
+    private void recalcRowRates(Map<String, Object> t) {
+        double s = or0(num(t.get("销售金额")));
+        double p = or0(num(t.get("含税毛利")));
+        double c = or0(num(t.get("交易笔数")));
+        double ps = or0(num(t.get("对期销售金额")));
+        double pp = or0(num(t.get("对期含税毛利")));
+        double pc = or0(num(t.get("对期交易笔数")));
+        t.put("销售额增长率", calcRate(s, ps));
+        t.put("毛利额增长率", calcRate(p, pp));
+        if (s > 0) {
+            t.put("毛利率", round2(p / s * 100));
+        }
+        if (c > 0) {
+            t.put("客单价", s / c);
+        }
+        if (pc > 0) {
+            t.put("对期客单价", ps / pc);
+        }
+    }
+
+    private double or0(Double d) {
+        return d == null ? 0 : d;
     }
 
     /** 按部门编码前2位推导部组名称；未知前缀返回 null（该行不展示） */
