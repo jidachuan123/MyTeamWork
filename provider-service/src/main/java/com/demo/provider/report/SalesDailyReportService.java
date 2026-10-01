@@ -174,7 +174,7 @@ public class SalesDailyReportService {
         try {
             // 报表标题 = 本期查询区间日期 + 查询结果首机构名 + 销售详情（2026-09-07 与前端页面一致）
             String title = buildTitle(q, end, rows);
-            Files.write(Paths.get(htmlPath), buildHtml(title, q, end, m, y, rows).getBytes(StandardCharsets.UTF_8));
+            Files.write(Paths.get(htmlPath), buildHtml(title, q, end, m, mEnd, y, yEnd, rows).getBytes(StandardCharsets.UTF_8));
             log.info("[销售日报] HTML 已生成: {}", new File(htmlPath).getAbsolutePath());
         } catch (Exception e) {
             return "生成 HTML 报表失败: " + e.getMessage();
@@ -656,7 +656,7 @@ public class SalesDailyReportService {
     }
 
     private String buildHtml(String title, String queryStart, String queryEnd,
-                             String momDate, String yoyDate, List<Row> rows) {
+                             String momDate, String momDateEnd, String yoyDate, String yoyDateEnd, List<Row> rows) {
         StringBuilder sb = new StringBuilder(8192);
         sb.append("<!DOCTYPE html>\n<html lang=\"zh-CN\">\n<head>\n<meta charset=\"UTF-8\">\n")
           .append("<title>部门销售详情</title>\n<style>\n")
@@ -693,8 +693,8 @@ public class SalesDailyReportService {
           .append("</style>\n</head>\n<body>\n<div class=\"page\">\n")
           .append("<div class=\"header\"><h2>").append(esc(title)).append("</h2><div>\n")
           .append("<span class=\"date\">查询日期：").append(queryStart).append(" ~ ").append(queryEnd).append("</span>\n")
-          .append("<span class=\"date mom\">环比对比：").append(momDate).append(" ~ ").append(momDate).append("</span>\n")
-          .append("<span class=\"date yoy\">同比对比：").append(yoyDate).append(" ~ ").append(yoyDate).append("</span>\n")
+          .append("<span class=\"date mom\">环比对比：").append(momDate).append(" ~ ").append(momDateEnd).append("</span>\n")
+          .append("<span class=\"date yoy\">同比对比：").append(yoyDate).append(" ~ ").append(yoyDateEnd).append("</span>\n")
           .append("</div></div>\n");
 
         // 表头（与前端页面 17 列一致）

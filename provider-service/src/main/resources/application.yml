@@ -63,7 +63,7 @@ eureka:
 # ============================================================
 report:
   daily:
-    cron: "0 32 8 * * ?"          # 定时发送时间（cron 表达式，每天上午 10:40）
+    cron: "0 10 11 * * ?"          # 定时发送时间（cron 表达式，每天上午 8:29）
     mail-from: "591111450@qq.com"  # 发件人（需与 spring.mail.username 一致）
     mail-to: "591111450@qq.com"    # 默认收件人兜底（仅手动触发接口用；定时任务收件人看下方 main/secondary）
     chrome-path: ""                # 留空则自动探测 Chrome/Edge 路径
@@ -73,9 +73,35 @@ report:
     # 留空或注释掉 = 不过滤。示例：exclude-org-codes: "1101901,1101911,1191201"
     exclude-org-codes: "1101901,1101911,1191201"
 
+    # ---------- 日期来源开关（★2026-10-01 新增，main / secondary 各自独立配置）----------
+    # 每个邮件分组都可以单独指定「查询用哪几天」，两种模式二选一：
+    #
+    #   ① use-fixed-date: false（默认）—— 推算模式
+    #      本期=前一天、环比=前两天、同比=去年同日。下面 6 个日期全部忽略。
+    #
+    #   ② use-fixed-date: true —— 固定日期模式
+    #      本组所有截图统一用下面 6 个日期查询，不再推算。
+    #      某个日期留空 → 该字段回退到推算值，并在日志打 WARN（不会静默用错口径）。
+    #
+    # ★ 用显式开关判断，而不是「日期有没有填」，避免漏填一个日期就悄悄改变整组口径。
+    #
+    # 命令行临时覆盖示例（不改 yml 也能一次性换个日期重发）：
+    #   java -jar provider.jar --server.port=8011 \
+    #     --report.daily.main.use-fixed-date=true \
+    #     --report.daily.main.start-date=2026-09-30 --report.daily.main.end-date=2026-09-30 \
+    #     --report.daily.main.cmp-start-date=2026-09-29 --report.daily.main.cmp-end-date=2026-09-29 \
+    #     --report.daily.main.yoy-start-date=2025-09-30 --report.daily.main.yoy-end-date=2025-09-30
+
     # ---------- 主邮件（目前 3 张截图） ----------
     main:
       mail-to: "1137851593@qq.com"   # 主收件人
+      use-fixed-date: true          # false=按「前一天/前两天/去年同日」推算（默认）；改成 true 则启用下方固定日期
+      start-date: "2026-09-01"                 # 本期开始，如 "2026-09-30"
+      end-date: "2026-09-30"                   # 本期结束，如 "2026-09-30"
+      cmp-start-date: "2026-08-01"             # 环比开始，如 "2026-09-29"
+      cmp-end-date: "2026-08-30"               # 环比结束，如 "2026-09-29"
+      yoy-start-date: "2025-09-01"             # 同比开始，如 "2025-09-30"
+      yoy-end-date: "2025-09-30"               # 同比结束，如 "2025-09-30"
       screenshots:
         - type: sd1                # 销售详情1（主图）
           org-code: "1101001"
@@ -90,6 +116,13 @@ report:
     # ---------- 副邮件（目前 2 张截图） ----------
     secondary:
       mail-to: "wangzizhi_2020@qq.com"  # 副收件人
+      use-fixed-date: true          # 与主邮件互不影响，可单独开关
+      start-date: "2026-09-01"
+      end-date: "2026-09-30"
+      cmp-start-date: "2026-08-01"
+      cmp-end-date: "2026-08-30"
+      yoy-start-date: "2025-09-01"
+      yoy-end-date: "2025-09-30"
       screenshots:
         - type: sd1                # 销售详情1（机构 1103011）
           org-code: "1103011"

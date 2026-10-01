@@ -52,6 +52,22 @@ public class ReportDailyProperties {
         private String mailTo = "";
         private List<ScreenshotTask> screenshots = new ArrayList<>();
 
+        // ===== 日期来源配置（2026-10-01 新增）=====
+        // useFixedDate=false（默认）：本组所有截图按「本期=前一天、环比=前两天、同比=去年同日」推算（原逻辑，行为不变）
+        // useFixedDate=true        ：本组所有截图统一用下面 6 个日期查询，不再推算
+        // ★ 用显式开关而不是「日期有没有填」来判断，避免漏填一个日期就静默改变整个分组的口径
+        private boolean useFixedDate = false;
+
+        // 本期开始 / 结束日期（yyyy-MM-dd）；留空则该字段回退到推算值，并在日志里 WARN
+        private String startDate = "";
+        private String endDate = "";
+        // 环比对比开始 / 结束日期
+        private String cmpStartDate = "";
+        private String cmpEndDate = "";
+        // 同比对比开始 / 结束日期
+        private String yoyStartDate = "";
+        private String yoyEndDate = "";
+
         public String getMailTo() {
             return mailTo;
         }
@@ -66,6 +82,62 @@ public class ReportDailyProperties {
 
         public void setScreenshots(List<ScreenshotTask> screenshots) {
             this.screenshots = screenshots;
+        }
+
+        public boolean isUseFixedDate() {
+            return useFixedDate;
+        }
+
+        public void setUseFixedDate(boolean useFixedDate) {
+            this.useFixedDate = useFixedDate;
+        }
+
+        public String getStartDate() {
+            return startDate;
+        }
+
+        public void setStartDate(String startDate) {
+            this.startDate = startDate;
+        }
+
+        public String getEndDate() {
+            return endDate;
+        }
+
+        public void setEndDate(String endDate) {
+            this.endDate = endDate;
+        }
+
+        public String getCmpStartDate() {
+            return cmpStartDate;
+        }
+
+        public void setCmpStartDate(String cmpStartDate) {
+            this.cmpStartDate = cmpStartDate;
+        }
+
+        public String getCmpEndDate() {
+            return cmpEndDate;
+        }
+
+        public void setCmpEndDate(String cmpEndDate) {
+            this.cmpEndDate = cmpEndDate;
+        }
+
+        public String getYoyStartDate() {
+            return yoyStartDate;
+        }
+
+        public void setYoyStartDate(String yoyStartDate) {
+            this.yoyStartDate = yoyStartDate;
+        }
+
+        public String getYoyEndDate() {
+            return yoyEndDate;
+        }
+
+        public void setYoyEndDate(String yoyEndDate) {
+            this.yoyEndDate = yoyEndDate;
         }
     }
 

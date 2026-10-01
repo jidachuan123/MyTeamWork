@@ -73,6 +73,10 @@ public class SalesDailyReportScheduler {
             return;
         }
 
+        // ★ 日期来源：use-fixed-date=true → 用本组配置的固定日期（缺失项逐字段回退推算值）
+        //   false（默认）→ 全部按「本期=前一天、环比=前两天、同比=去年同日」推算（原逻辑）
+        DailyReportParam fixedReq = group.isUseFixedDate() ? buildFixedParam(group, date, groupName) : null;
+
         for (ReportDailyProperties.ScreenshotTask task : group.getScreenshots()) {
             String type = (task.getType() == null) ? "sd1" : task.getType().trim().toLowerCase();
             String orgCode = (task.getOrgCode() == null) ? "" : task.getOrgCode().trim();
@@ -81,7 +85,17 @@ public class SalesDailyReportScheduler {
             String label = ("sd2".equals(type) ? "销售详情2" : "销售详情1") + (orgCode.isEmpty() ? "" : "(" + orgCode + ")");
             try {
                 String png;
-                if ("sd2".equals(type)) {
+                if (fixedReq != null) {
+                    // 固定日期模式：机构/层级仍按每张截图自己的配置，只有日期被覆盖
+                    fixedReq.setOrgCode(orgCode);
+                    fixedReq.setDeptLevels("sd2".equals(type) ? "" : "3");
+                    fixedReq.setDepartment("");
+                    if ("sd2".equals(type)) {
+                        png = salesDetail2ReportService.generateDailyReport(fixedReq, tag, unionStockCodes);
+                    } else {
+                        png = salesDailyReportService.generateDailyReport(fixedReq, tag);
+                    }
+                } else if ("sd2".equals(type)) {
                     png = salesDetail2ReportService.generateDailyReport(date, orgCode, tag, unionStockCodes);
                 } else {
                     png = salesDailyReportService.generateDailyReport(date, orgCode, tag);
@@ -106,13 +120,48 @@ public class SalesDailyReportScheduler {
             sb.append(groupName).append("：无截图生成，跳过邮件发送\n");
             return;
         }
+        // 邮件主题 / 文件名日期：固定日期模式用配置的本期结束日期，否则用发送日推算的本期日期
+        String mailDate = (fixedReq != null) ? fixedReq.getEndDate() : todayStr;
         try {
-            String result = salesDailyReportService.sendMail(todayStr, pngs, recipient, desc.toString());
+            String result = salesDailyReportService.sendMail(mailDate, pngs, recipient, desc.toString());
             sb.append("邮件(").append(recipient).append(") 发送结果：").append(result.trim()).append("\n");
         } catch (Exception e) {
             sb.append("邮件(").append(recipient).append(") 发送异常：").append(e.getMessage()).append("\n");
             log.error("[销售日报] 邮件发送异常（{}）", recipient, e);
         }
+    }
+
+    /**
+     * 构造「固定日期」模式下的查询参数：6 个日期全部取自分组配置。
+     * 某个日期没配 → 回退到该字段的推算值（SD1/SD2 推算规则不同，这里按 SD1 规则），并打 WARN 提醒。
+     */
+    private DailyReportParam buildFixedParam(ReportDailyProperties.MailGroup group, LocalDate date, String groupName) {
+        DailyReportParam req = new DailyReportParam();
+        String cur = date.minusDays(1).format(DTF);
+        String cmp = date.minusDays(2).format(DTF);
+        String yoy = date.minusYears(1).format(DTF);   // SD2 原本是「去年本期就近同周几」，固定模式下按配置的来，不再推算
+
+        req.setStartDate(fallback(group.getStartDate(), cur, groupName, "start-date"));
+        req.setEndDate(fallback(group.getEndDate(), cur, groupName, "end-date"));
+        req.setCmpStartDate(fallback(group.getCmpStartDate(), cmp, groupName, "cmp-start-date"));
+        req.setCmpEndDate(fallback(group.getCmpEndDate(), cmp, groupName, "cmp-end-date"));
+        req.setYoyStartDate(fallback(group.getYoyStartDate(), yoy, groupName, "yoy-start-date"));
+        req.setYoyEndDate(fallback(group.getYoyEndDate(), yoy, groupName, "yoy-end-date"));
+
+        log.info("[销售日报] {} 使用固定日期：本期 {}/{} 环比 {}/{} 同比 {}/{}",
+                groupName, req.getStartDate(), req.getEndDate(),
+                req.getCmpStartDate(), req.getCmpEndDate(),
+                req.getYoyStartDate(), req.getYoyEndDate());
+        return req;
+    }
+
+    /** 配置值为空时回退推算值，并打 WARN（避免「开关开了但日期漏填」被静默忽略） */
+    private String fallback(String configured, String computed, String groupName, String field) {
+        if (configured != null && !configured.trim().isEmpty()) {
+            return configured.trim();
+        }
+        log.warn("[销售日报] {} 已开启 use-fixed-date 但未配置 {}，回退使用推算值 {}", groupName, field, computed);
+        return computed;
     }
 
     @Scheduled(cron = "${report.daily.cron:0 15 8 * * ?}")

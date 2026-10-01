@@ -194,7 +194,7 @@ public class SalesDetail2ReportService {
         String tag = (fileTag != null && !fileTag.trim().isEmpty()) ? "-" + fileTag.trim() : "";
         String htmlPath = outputDir + "/sales-detail2-" + today + tag + ".html";
         try {
-            Files.write(Paths.get(htmlPath), buildHtml(q, m, y, rows).getBytes(StandardCharsets.UTF_8));
+            Files.write(Paths.get(htmlPath), buildHtml(q, end, m, mEnd, y, yEnd, rows).getBytes(StandardCharsets.UTF_8));
             log.info("[销售详情2] HTML 已生成: {}", new File(htmlPath).getAbsolutePath());
         } catch (Exception e) {
             log.error("[销售详情2] 生成 HTML 失败", e);
@@ -498,7 +498,8 @@ public class SalesDetail2ReportService {
 
     // ==================== HTML 生成 ====================
 
-    private String buildHtml(String queryDate, String momDate, String yoyDate, List<StoreRow> rows) {
+    private String buildHtml(String queryDate, String queryDateEnd, String momDate, String momDateEnd,
+                             String yoyDate, String yoyDateEnd, List<StoreRow> rows) {
         StringBuilder sb = new StringBuilder(8192);
         sb.append("<!DOCTYPE html>\n<html lang=\"zh-CN\">\n<head>\n<meta charset=\"UTF-8\">\n")
           .append("<title>各店每月销售详情</title>\n<style>\n")
@@ -527,9 +528,9 @@ public class SalesDetail2ReportService {
           .append("td.rate-down .rate-arrow{color:#c62828 !important;font-weight:600;}\n")
           .append("</style>\n</head>\n<body>\n<div class=\"page\">\n")
           .append("<div class=\"header\"><h2>各店每月销售详情</h2><div>\n")
-          .append("<span class=\"date\">查询日期：").append(queryDate).append(" ~ ").append(queryDate).append("</span>\n")
-          .append("<span class=\"date mom\">环比对比：").append(momDate).append(" ~ ").append(momDate).append("</span>\n")
-          .append("<span class=\"date yoy\">同比对比：").append(yoyDate).append(" ~ ").append(yoyDate).append("</span>\n")
+          .append("<span class=\"date\">查询日期：").append(queryDate).append(" ~ ").append(queryDateEnd).append("</span>\n")
+          .append("<span class=\"date mom\">环比对比：").append(momDate).append(" ~ ").append(momDateEnd).append("</span>\n")
+          .append("<span class=\"date yoy\">同比对比：").append(yoyDate).append(" ~ ").append(yoyDateEnd).append("</span>\n")
           .append("</div></div>\n");
 
         // 表头（16 列，与前端 SalesDetail2.vue 一致：含当日库存金额）
