@@ -52,6 +52,36 @@ public class ReportDailyProperties {
         private String mailTo = "";
         private List<ScreenshotTask> screenshots = new ArrayList<>();
 
+        /**
+         * 企业微信群机器人 Webhook 地址（2026-10-11 新增）。
+         * 留空 = 不推企微；填了就把本组截图推到对应群（先发一条摘要，再逐张发图）。
+         * 与 mail-to 互不冲突：两个都填就邮件和企微都发；想停邮件把 mail-to 清空即可。
+         * 获取方式：企业微信群 → 右上角设置 → 群机器人 → 添加 → 复制 Webhook 地址。
+         */
+        private String wecomWebhook = "";
+
+        /**
+         * 企业微信推送的「摘要文案」（2026-10-12 新增）。
+         * 留空 = 用代码默认模板（标题 + 报表范围 + 本期/环比/同比）。
+         * 填了 = 完全按你写的原文发送（markdown 语法可用：**加粗** / > 引用）。
+         *
+         * 支持占位符（发消息时自动替换，不想用可以不写）：
+         *   {date} 报表日期（固定日期模式取配置的结束日期，否则取本期日期）
+         *   {cur}  本期区间，如 2026-09-01 ~ 2026-09-30
+         *   {cmp}  环比区间
+         *   {yoy}  同比区间
+         *   {range} 报表范围（各截图任务的名称+机构拼成）
+         *
+         * yml 多行写法（推荐，换行用 \n 会很难读）：
+         * <pre>
+         * wecom-digest: |
+         *   **销售日报 {date}**
+         *   > 本期：{cur}
+         *   > 环比：{cmp}
+         * </pre>
+         */
+        private String wecomDigest = "";
+
         // ===== 日期来源配置（2026-10-01 新增）=====
         // useFixedDate=false（默认）：本组所有截图按「本期=前一天、环比=前两天、同比=去年同日」推算（原逻辑，行为不变）
         // useFixedDate=true        ：本组所有截图统一用下面 6 个日期查询，不再推算
@@ -82,6 +112,22 @@ public class ReportDailyProperties {
 
         public void setScreenshots(List<ScreenshotTask> screenshots) {
             this.screenshots = screenshots;
+        }
+
+        public String getWecomWebhook() {
+            return wecomWebhook;
+        }
+
+        public void setWecomWebhook(String wecomWebhook) {
+            this.wecomWebhook = wecomWebhook;
+        }
+
+        public String getWecomDigest() {
+            return wecomDigest;
+        }
+
+        public void setWecomDigest(String wecomDigest) {
+            this.wecomDigest = wecomDigest;
         }
 
         public boolean isUseFixedDate() {

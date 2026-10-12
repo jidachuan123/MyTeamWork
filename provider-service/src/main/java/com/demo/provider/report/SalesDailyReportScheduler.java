@@ -38,6 +38,9 @@ public class SalesDailyReportScheduler {
     @Autowired
     private ReportDailyProperties props;
 
+    @Autowired
+    private WeComBotService weComBotService;
+
     /**
      * 手动/立即执行销售日报完整流程（含截图 + 邮件）。
      * 供定时任务和手动触发接口复用。
@@ -129,6 +132,54 @@ public class SalesDailyReportScheduler {
             sb.append("邮件(").append(recipient).append(") 发送异常：").append(e.getMessage()).append("\n");
             log.error("[销售日报] 邮件发送异常（{}）", recipient, e);
         }
+
+        // ===== 企业微信群机器人推送（2026-10-11 新增）=====
+        // 配了 wecom-webhook 才会推送：先发一条 markdown 摘要，再逐张发截图
+        // 与邮件互不冲突（两个都配就都发；想停邮件把 mail-to 清空即可）
+        String webhook = (group.getWecomWebhook() == null) ? "" : group.getWecomWebhook().trim();
+        if (!webhook.isEmpty()) {
+            try {
+                String r = weComBotService.sendReport(webhook, buildDigest(mailDate, desc.toString(), fixedReq, date, group), pngs);
+                sb.append(groupName).append(" 企微推送：").append(r.trim()).append("\n");
+            } catch (Exception e) {
+                sb.append(groupName).append(" 企微推送异常：").append(e.getMessage()).append("\n");
+                log.error("[销售日报] {} 企微推送异常", groupName, e);
+            }
+        }
+    }
+
+    /**
+     * 企微摘要文案。
+     * 优先级：yml 配了 wecom-digest → 完全用配置原文（仅替换占位符）；没配 → 用代码默认模板。
+     * 占位符：{date} {cur} {cmp} {yoy} {range}
+     */
+    private String buildDigest(String mailDate, String desc, DailyReportParam fixedReq, LocalDate date,
+                               ReportDailyProperties.MailGroup group) {
+        String cur, cmp, yoy;
+        if (fixedReq != null) {
+            cur = fixedReq.getStartDate() + " ~ " + fixedReq.getEndDate();
+            cmp = fixedReq.getCmpStartDate() + " ~ " + fixedReq.getCmpEndDate();
+            yoy = fixedReq.getYoyStartDate() + " ~ " + fixedReq.getYoyEndDate();
+        } else {
+            cur = date.minusDays(1).format(DTF);
+            cmp = date.minusDays(2).format(DTF);
+            yoy = date.minusYears(1).format(DTF);
+        }
+
+        String tpl = (group == null || group.getWecomDigest() == null) ? "" : group.getWecomDigest();
+        if (!tpl.trim().isEmpty()) {
+            return tpl.replace("{date}", mailDate)
+                      .replace("{cur}", cur)
+                      .replace("{cmp}", cmp)
+                      .replace("{yoy}", yoy)
+                      .replace("{range}", desc);
+        }
+
+        return "**销售详情日报 " + mailDate + "**\n"
+                + "> 报表范围：" + desc + "\n"
+                + "> 本期：" + cur + "\n"
+                + "> 环比：" + cmp + "\n"
+                + "> 同比：" + yoy;
     }
 
     /**

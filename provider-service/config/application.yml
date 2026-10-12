@@ -19,6 +19,25 @@ report:
       yoy-start-date: "2025-09-01"   # 同比开始
       yoy-end-date: "2025-09-30"     # 同比结束
 
+      # 企业微信群机器人：填了就把本组截图推到对应群（先发一条摘要，再逐张发图）
+      # 获取：企业微信群 → 设置 → 群机器人 → 添加 → 复制 Webhook 地址
+      # 与 mail-to 互不冲突：两个都填 = 邮件和企微都发；想停邮件就把上面 mail-to 清空
+      wecom-webhook: ""              # ← 拿到地址后粘到这里，重启生效
+
+      # 企微摘要文案（图片上面那段文字）。留空 = 用代码默认模板；
+      # 填了就完全按你写的发。支持占位符：{date} {cur} {cmp} {yoy} {range}
+      # 单行写法（换行写 \n）：
+      #   wecom-digest: "**佳和销售日报 {date}**\n> 本期：{cur}\n> 同比：{yoy}"
+      # 多行写法（推荐，去掉注释井号即可，注意缩进对齐）：
+      #   wecom-digest: |
+      #     **佳和销售日报 {date}**
+      #     > 本期：{cur}
+      #     > 环比：{cmp}
+      #     > 同比：{yoy}
+      wecom-digest: ""
+
     # ---------- 副邮件（需要固定日期时照上面格式加 use-fixed-date + 6 个日期即可）----------
     secondary:
       use-fixed-date: false
+      wecom-webhook: ""              # ← 副组想推另一个群就填这里
+      wecom-digest: ""               # ← 副组文案（同上，留空用默认模板）
