@@ -1,0 +1,70 @@
+# ============================================================
+# 销售详情3（SD3）独立配置  ——  2026-10-15 新建
+#
+# ★ 本文件与销售详情1/2 的 application.yml 完全隔离，
+#   原 application.yml 保持只服务 SD1/SD2，不做任何改动。
+# ★ 加载方式：Sd3Config 上用 @PropertySource + YamlPropertySourceFactory 读本文件。
+# ★ 改完重启生效（IDEA 里跑读的就是这个文件）。
+# ============================================================
+sd3:
+
+  # ---------- MySQL 数据源（bcm 库，与 SD1/SD2 的 SQL Server 相互独立）----------
+  datasource:
+    # 注意：JDBC 的 characterEncoding 只认 utf8 / UTF-8，写 utf8mb4 会抛
+    # 「Unsupported character encoding 'utf8mb4'」导致数据源启动失败
+    jdbc-url: "jdbc:mysql://192.168.0.62:3416/bcm?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&zeroDateTimeBehavior=convertToNull"
+    username: "root"
+    password: "Enjoyit.1JMysql"
+    driver-class-name: "com.mysql.cj.jdbc.Driver"
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 1
+      connection-timeout: 20000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+
+  # ---------- 取数 SQL ----------
+  # 默认读 classpath 下的文件；也可填绝对路径指向 jar 外的 .sql（改 SQL 不用重新打包）
+  sql-file: "classpath:sd3/sales-detail3.sql"
+
+  # ---------- 页面默认参数 ----------
+  # 机构 = 门店编码「精确匹配」，多个用逗号分隔：default-org-code: "1103011,1103021"
+  default-org-code: ""        # 页面打开时机构框默认值（空=不筛选机构）
+  default-chnl: ""            # 页面打开时渠道默认值（空=全部渠道）
+
+  # 渠道下拉选项（单选，顺序 = 表格里渠道分组的展示顺序）
+  chnl-options:
+    - "昂捷到家01"
+    - "美团闪购"
+    - "淘宝闪购"
+    - "03京东到家"
+
+  # ---------- 定时任务 ----------
+  # 每天发送时间（避开 SD1/SD2 的 8:29，防止同时抢 Chrome）
+  cron: "0 35 8 * * ?"
+
+  # 定时发送时的查询参数（页面手动查询不受此限制，页面用啥就是啥）
+  # ★ 机构按门店编码「精确匹配」，多个用逗号分隔（不是前缀模糊了！）
+  #   例：org-code: "1103011,1103021"  → 只发这两个店；留空=全部机构
+  org-code: "1103011,1103021,1104019,1106001,1104018,1104017"                # 机构：门店编码，逗号分隔，空=全部机构
+  chnl: ""                    # 渠道：留空=全部渠道；填了只发该渠道
+  order-no: ""                # 订单号：一般留空
+
+  # 日期：false = 每天自动取「前一天」；true = 固定用下面两个日期
+  use-fixed-date: false
+  start-date: ""
+  end-date: ""
+
+  # ---------- 推送渠道（与 SD1/SD2 逻辑一致，两个都填就都发）----------
+  mail-to: ""                 # 邮件收件人，留空不发邮件
+  wecom-webhook: ""           # 企业微信机器人 Webhook，留空不推企微
+  # 企微摘要文案，留空用默认模板；支持占位符 {date} {org} {chnl} {amt} {orders} {avg}
+  wecom-digest: ""
+
+  # ---------- 截图输出目录 ----------
+  output-dir: "target/report"
+
+  # ---------- 底部总计行文案 ----------
+  # 总计行左侧会合并成一个大格（跨 序号/门店编码/门店名称/平台 4 列），这里配文案
+  # 例：total-label: "菏泽区域线上销售共计"
+  total-label: "线上外卖销售共计"
