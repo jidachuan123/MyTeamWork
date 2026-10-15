@@ -95,7 +95,7 @@ report:
     # ---------- 主邮件（目前 3 张截图） ----------
     main:
       mail-to: "1137851593@qq.com"   # 主收件人
-      wecom-webhook: "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=0fe8f6c9-8ce2-4a57-bc5e-759c711fd729"
+      wecom-webhook: "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=d75971ba-020f-41b0-b465-90b200e50803"
       # 企微摘要文案（发图前那段文字）。留空 = 用代码默认模板；填了完全按你写的发。
       # 支持占位符：{date} 报表日期、{cur} 本期区间、{cmp} 环比区间、{yoy} 同比区间、{range} 报表范围
       # 单行写法（换行写 \n）：wecom-digest: "**佳和销售日报 {date}**\n> 本期：{cur}\n> 同比：{yoy}"
@@ -127,7 +127,7 @@ report:
     # ---------- 副邮件（目前 2 张截图） ----------
     secondary:
       mail-to: "wangzizhi_2020@qq.com"  # 副收件人
-      wecom-webhook: "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=0fe8f6c9-8ce2-4a57-bc5e-759c711fd729"
+      wecom-webhook: "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=d75971ba-020f-41b0-b465-90b200e50803"
       wecom-digest: "菏泽销售报表:"               # 副组文案（占位符同上，留空用默认模板）
       use-fixed-date: false          # 与主邮件互不影响，可单独开关
       start-date: "2026-09-01"
