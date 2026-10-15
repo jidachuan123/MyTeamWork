@@ -9,6 +9,7 @@ import org.springframework.stereotype.Component;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -69,37 +70,73 @@ public class SalesDetail3Scheduler {
         } else {
             startDate = endDate = cur;
         }
-        String orgCode = props.getOrgCode() == null ? "" : props.getOrgCode().trim();
         String chnl = props.getChnl() == null ? "" : props.getChnl().trim();
         String orderNo = props.getOrderNo() == null ? "" : props.getOrderNo().trim();
 
-        log.info("[销售详情3] 使用日期：本期 {}/{} 机构={} 渠道={}",
-                startDate, endDate, orgCode.isEmpty() ? "(全部)" : orgCode, chnl.isEmpty() ? "(全部)" : chnl);
+        // 截图任务列表：优先用 screenshots 配置；为空则回退用单一 org-code（向后兼容，发一张）
+        List<Sd3Properties.ScreenshotTask> tasks = props.getScreenshots();
+        if (tasks == null || tasks.isEmpty()) {
+            String org = props.getOrgCode() == null ? "" : props.getOrgCode().trim();
+            Sd3Properties.ScreenshotTask t = new Sd3Properties.ScreenshotTask();
+            t.setOrgCode(org);
+            tasks = Collections.singletonList(t);
+        }
+
+        log.info("[销售详情3] 使用日期：本期 {}/{} 渠道={} 截图任务数={}",
+                startDate, endDate, chnl.isEmpty() ? "(全部)" : chnl, tasks.size());
 
         StringBuilder sb = new StringBuilder();
         sb.append("[销售详情3] 开始执行（").append(endDate).append("）\n");
 
-        // ===== 1. 截图 =====
-        String png = reportService3.generateReport(startDate, endDate, orgCode, chnl, orderNo);
-        if (png == null) {
-            sb.append("截图失败，终止推送\n");
+        // ===== 1. 截图：按 screenshots 列表逐张生成 =====
+        List<String> pngs = new ArrayList<>();
+        List<String> orgList = new ArrayList<>();
+        StringBuilder desc = new StringBuilder();
+        for (Sd3Properties.ScreenshotTask task : tasks) {
+            String org = task.getOrgCode() == null ? "" : task.getOrgCode().trim();
+            String tag = task.getTag() == null ? "" : task.getTag().trim();
+            String label = "销售详情3" + (org.isEmpty() ? "" : "(" + org + ")");
+            if (!org.isEmpty()) {
+                orgList.add(org);
+            }
+            try {
+                String title = task.getTitle() == null ? "" : task.getTitle().trim();
+                String totalLabel = task.getTotalLabel() == null ? "" : task.getTotalLabel().trim();
+                String png = reportService3.generateReport(startDate, endDate, org, chnl, orderNo, tag, title, totalLabel);
+                if (png != null) {
+                    pngs.add(png);
+                    sb.append(label).append(" 截图成功：").append(png).append("\n");
+                } else {
+                    sb.append(label).append(" 截图失败\n");
+                }
+                if (desc.length() > 0) {
+                    desc.append(" + ");
+                }
+                desc.append(label);
+            } catch (Exception e) {
+                sb.append(label).append(" 生成异常：").append(e.getMessage()).append("\n");
+                log.error("[销售详情3] 截图生成异常（org={}, tag={}）", org, tag, e);
+            }
+        }
+        if (pngs.isEmpty()) {
+            sb.append("截图全部失败，终止推送\n");
             return sb.toString();
         }
-        sb.append("截图成功：").append(png).append("\n");
-        List<String> pngs = new ArrayList<>();
-        pngs.add(png);
 
         // ===== 2. 摘要数据（邮件正文 / 企微文案共用）=====
-        SalesDetail3Service.Sd3Result result = sd3Service.query(startDate, endDate, orgCode, chnl, orderNo);
-        SalesDetail3Service.Sd3Row total = result.getTotal();
-        String desc = "销售详情3";
-        String digest = buildDigest(endDate, orgCode, chnl, total);
+        // 单机构：带金额汇总；多机构：只给机构范围（金额看各图），避免误导
+        SalesDetail3Service.Sd3Row total = null;
+        if (tasks.size() == 1) {
+            String org = tasks.get(0).getOrgCode() == null ? "" : tasks.get(0).getOrgCode().trim();
+            total = sd3Service.query(startDate, endDate, org, chnl, orderNo).getTotal();
+        }
+        String digest = buildDigest(endDate, orgList, chnl, total);
 
         // ===== 3. 邮件 =====
         String mailTo = props.getMailTo() == null ? "" : props.getMailTo().trim();
         if (!mailTo.isEmpty()) {
             try {
-                String r = mailService.sendMail(endDate, pngs, mailTo, desc);
+                String r = mailService.sendMail(endDate, pngs, mailTo, desc.toString());
                 sb.append("邮件(").append(mailTo).append(") 发送结果：").append(r.trim()).append("\n");
             } catch (Exception e) {
                 sb.append("邮件(").append(mailTo).append(") 发送异常：").append(e.getMessage()).append("\n");
@@ -130,14 +167,18 @@ public class SalesDetail3Scheduler {
     /**
      * 企微摘要文案：配了 wecom-digest 就用配置原文（替换占位符），否则用默认模板。
      * 占位符：{date} {org} {chnl} {amt} {orders} {avg}
+     *
+     * @param orgList 各截图任务的机构列表（多机构时拼接展示）
+     * @param total   单机构时的金额汇总；多机构传 null（金额看各图，避免误导）
      */
-    private String buildDigest(String date, String orgCode, String chnl,
+    private String buildDigest(String date, List<String> orgList, String chnl,
                                SalesDetail3Service.Sd3Row total) {
-        String orgText = (orgCode == null || orgCode.trim().isEmpty()) ? "全部机构" : orgCode.trim();
+        String orgText = (orgList == null || orgList.isEmpty()) ? "全部机构" : String.join(", ", orgList);
         String chnlText = (chnl == null || chnl.trim().isEmpty()) ? "全部渠道" : chnl.trim();
-        String amt = total == null || total.getSaleAmt() == null ? "0.00" : total.getSaleAmt().toPlainString();
-        String orders = total == null ? "0" : String.valueOf(total.getOrderCnt());
-        String avg = total == null || total.getAvgPrice() == null ? "0.00" : total.getAvgPrice().toPlainString();
+        boolean hasAmount = total != null;
+        String amt = hasAmount && total.getSaleAmt() != null ? total.getSaleAmt().toPlainString() : "";
+        String orders = hasAmount ? String.valueOf(total.getOrderCnt()) : "";
+        String avg = hasAmount && total.getAvgPrice() != null ? total.getAvgPrice().toPlainString() : "";
 
         String tpl = (props.getWecomDigest() == null) ? "" : props.getWecomDigest();
         if (!tpl.trim().isEmpty()) {
@@ -149,12 +190,17 @@ public class SalesDetail3Scheduler {
                       .replace("{avg}", avg);
         }
 
+        if (hasAmount) {
+            return "**销售详情3 " + date + "**\n"
+                    + "> 机构：" + orgText + "\n"
+                    + "> 渠道：" + chnlText + "\n"
+                    + "> 销售额：" + amt + "\n"
+                    + "> 订单数：" + orders + "\n"
+                    + "> 客单价：" + avg;
+        }
         return "**销售详情3 " + date + "**\n"
                 + "> 机构：" + orgText + "\n"
-                + "> 渠道：" + chnlText + "\n"
-                + "> 销售额：" + amt + "\n"
-                + "> 订单数：" + orders + "\n"
-                + "> 客单价：" + avg;
+                + "> 渠道：" + chnlText;
     }
 
     /** 配置值为空时回退推算值并打 WARN（与 SD1/SD2 同样的「不静默」原则） */

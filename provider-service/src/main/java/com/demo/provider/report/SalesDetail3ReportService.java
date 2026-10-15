@@ -61,15 +61,22 @@ public class SalesDetail3ReportService {
      * @param orgCode   机构（空=全部）
      * @param chnl      渠道（空=全部）
      * @param orderNo   订单号（空=不筛选）
-     * @param fileTag   文件名后缀（同日多机构时区分，防覆盖）；可空
+     * @param fileTag        文件名后缀（同日多机构时区分，防覆盖）；可空
+     * @param taskTitle      本张截图顶部标题（screenshots 里配的）；空=用全局 sd3.title
+     * @param taskTotalLabel 本张截图底部总计行的文案（screenshots 里配的）；空=用全局 sd3.total-label
      * @return PNG 绝对路径；失败返回 null
      */
     public String generateReport(String startDate, String endDate, String orgCode,
-                                 String chnl, String orderNo, String fileTag) {
+                                 String chnl, String orderNo, String fileTag,
+                                 String taskTitle, String taskTotalLabel) {
         try {
-            reportService.ensureOutputDir();
+            // ★ 自己创建 SD3 的输出目录（不能复用 SD1 的 ensureOutputDir —— 那个建的是
+            //   report.daily.output-dir，与 sd3.output-dir 不是同一个路径，尤其 IDEA 里跑
+            //   工作目录不是 provider-service 时，相对路径 target/report 会因目录不存在报
+            //   NoSuchFileException）。用 createDirectories 相对/绝对路径都能正确创建。
+            Files.createDirectories(Paths.get(outputDir));
         } catch (Exception e) {
-            log.error("[销售详情3] 创建输出目录失败", e);
+            log.error("[销售详情3] 创建输出目录失败：{}", outputDir, e);
             return null;
         }
 
@@ -81,7 +88,7 @@ public class SalesDetail3ReportService {
         String htmlPath = outputDir + "/" + name + ".html";
         try {
             Files.write(Paths.get(htmlPath),
-                    buildHtml(startDate, endDate, orgCode, chnl, rows, result.getTotal()).getBytes(StandardCharsets.UTF_8));
+                    buildHtml(startDate, endDate, orgCode, chnl, rows, result.getTotal(), taskTitle, taskTotalLabel).getBytes(StandardCharsets.UTF_8));
             log.info("[销售详情3] HTML 已生成: {}", new File(htmlPath).getAbsolutePath());
         } catch (Exception e) {
             log.error("[销售详情3] 生成 HTML 失败", e);
@@ -96,13 +103,14 @@ public class SalesDetail3ReportService {
 
     /** 定时任务的便捷入口：日期为空时取前一天 */
     public String generateReport(String startDate, String endDate, String orgCode, String chnl, String orderNo) {
-        return generateReport(startDate, endDate, orgCode, chnl, orderNo, null);
+        return generateReport(startDate, endDate, orgCode, chnl, orderNo, null, null, null);
     }
 
     // ==================== HTML ====================
 
     private String buildHtml(String startDate, String endDate, String orgCode, String chnl,
-                             List<SalesDetail3Service.Sd3Row> rows, SalesDetail3Service.Sd3Row total) {
+                             List<SalesDetail3Service.Sd3Row> rows, SalesDetail3Service.Sd3Row total,
+                             String taskTitle, String taskTotalLabel) {
         String dateText = startDate.equals(endDate) ? startDate : startDate + " ~ " + endDate;
         StringBuilder sb = new StringBuilder(8192);
         sb.append("<!DOCTYPE html>\n<html lang=\"zh-CN\">\n<head>\n<meta charset=\"UTF-8\">\n")
@@ -120,7 +128,7 @@ public class SalesDetail3ReportService {
           .append("tr.total td{background:#F2E1A6 !important;border-top:2px solid #000;border-bottom:3px double #000;color:#1a1a1a !important;font-weight:800;}\n")
           .append("</style>\n</head>\n<body>\n<div class=\"page\">\n")
           .append("<div class=\"header\">\n")
-          .append("<h2>销售详情3（外卖渠道）</h2>\n")
+          .append("<h2>").append(esc(resolveTitle(taskTitle))).append("</h2>\n")
           .append("<span class=\"date\">查询日期：").append(dateText).append("</span>\n")
           .append("<span class=\"date\">机构：").append(orgCode == null || orgCode.trim().isEmpty() ? "全部" : orgCode).append("</span>\n")
           .append("<span class=\"date\">渠道：").append(chnl == null || chnl.trim().isEmpty() ? "全部" : chnl).append("</span>\n")
@@ -157,8 +165,9 @@ public class SalesDetail3ReportService {
                   .append("</tr>\n");
             }
             sb.append("<tr class=\"total\">")
-              // 左侧 4 列（序号/编码/名称/平台）合并成一个大格，文案可配置（sd3.total-label）
-              .append("<td colspan=\"4\">").append(esc(total.getTotalLabel() == null ? "线上外卖销售共计" : total.getTotalLabel())).append("</td>")
+              // 左侧 4 列（序号/编码/名称/平台）合并成一个大格
+              // 文案优先级：截图任务配置（screenshots[].total-label）> 全局 sd3.total-label > 默认
+              .append("<td colspan=\"4\">").append(esc(resolveTotalLabel(total, taskTotalLabel))).append("</td>")
               .append("<td>").append(fmt(total.getSaleAmt())).append("</td>")
               .append("<td>").append(total.getOrderCnt()).append("</td>")
               .append("<td>").append(fmt(total.getAvgPrice())).append("</td>")
@@ -167,6 +176,26 @@ public class SalesDetail3ReportService {
 
         sb.append("</tbody>\n</table>\n</div>\n</body>\n</html>");
         return sb.toString();
+    }
+
+    /** 标题文案优先级：截图任务配置（screenshots[].title）> 全局 sd3.title */
+    private String resolveTitle(String taskTitle) {
+        if (taskTitle != null && !taskTitle.trim().isEmpty()) {
+            return taskTitle.trim();
+        }
+        String global = props.getTitle();
+        return (global == null || global.trim().isEmpty()) ? "销售详情3（外卖渠道）" : global.trim();
+    }
+
+    /** 总计行文案优先级：截图任务配置 > 全局 sd3.total-label > 默认 */
+    private static String resolveTotalLabel(SalesDetail3Service.Sd3Row total, String taskTotalLabel) {
+        if (taskTotalLabel != null && !taskTotalLabel.trim().isEmpty()) {
+            return taskTotalLabel.trim();
+        }
+        if (total != null && total.getTotalLabel() != null && !total.getTotalLabel().trim().isEmpty()) {
+            return total.getTotalLabel();
+        }
+        return "线上外卖销售共计";
     }
 
     private static String fmt(BigDecimal v) {

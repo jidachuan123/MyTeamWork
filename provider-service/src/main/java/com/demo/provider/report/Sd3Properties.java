@@ -64,8 +64,67 @@ public class Sd3Properties {
     /** 截图输出目录 */
     private String outputDir = "target/report";
 
+    /** 截图顶部标题（默认「销售详情3（外卖渠道）」）；每条截图可用 title 单独覆盖 */
+    private String title = "销售详情3（外卖渠道）";
+
     /** 底部总计行左侧合并大格的文案（如：菏泽区域线上销售共计） */
     private String totalLabel = "线上外卖销售共计";
+
+    /**
+     * 截图列表（2026-10-15 新增）：定时任务按此逐张生成截图，每个机构一张图。
+     * 想发几张就配几条，顺序即发送顺序；留空则回退用上面的 org-code 单机构发一张（向后兼容）。
+     */
+    private List<ScreenshotTask> screenshots = new ArrayList<>();
+
+    /** 一张截图任务 */
+    public static class ScreenshotTask {
+        /** 机构：门店编码「精确匹配」，多个用英文逗号分隔；空=全部机构 */
+        private String orgCode = "";
+        /** 文件名后缀：同一日期多张不同机构时必填（否则同名互相覆盖），留空不带后缀 */
+        private String tag = "";
+        /**
+         * 本张截图顶部标题（如「菏泽区域线上销售」），每张图可不同。
+         * 留空 = 用全局 sd3.title；全局也没配 = 默认「销售详情3（外卖渠道）」。
+         */
+        private String title = "";
+        /**
+         * 本张截图底部总计行的文案（如「菏泽区域线上销售共计」），每张图可不同。
+         * 留空 = 用全局 sd3.total-label；全局也没配 = 默认「线上外卖销售共计」。
+         */
+        private String totalLabel = "";
+
+        public String getOrgCode() {
+            return orgCode;
+        }
+
+        public void setOrgCode(String orgCode) {
+            this.orgCode = orgCode;
+        }
+
+        public String getTag() {
+            return tag;
+        }
+
+        public void setTag(String tag) {
+            this.tag = tag;
+        }
+
+        public String getTitle() {
+            return title;
+        }
+
+        public void setTitle(String title) {
+            this.title = title;
+        }
+
+        public String getTotalLabel() {
+            return totalLabel;
+        }
+
+        public void setTotalLabel(String totalLabel) {
+            this.totalLabel = totalLabel;
+        }
+    }
 
     /** MySQL 数据源配置（前缀 sd3.datasource） */
     public static class DataSourceProps {
@@ -235,11 +294,27 @@ public class Sd3Properties {
         this.outputDir = outputDir;
     }
 
+    public String getTitle() {
+        return title;
+    }
+
+    public void setTitle(String title) {
+        this.title = title;
+    }
+
     public String getTotalLabel() {
         return totalLabel;
     }
 
     public void setTotalLabel(String totalLabel) {
         this.totalLabel = totalLabel;
+    }
+
+    public List<ScreenshotTask> getScreenshots() {
+        return screenshots;
+    }
+
+    public void setScreenshots(List<ScreenshotTask> screenshots) {
+        this.screenshots = screenshots;
     }
 }
