@@ -19,6 +19,7 @@ SELECT
     t.`门店名称` AS 门店名称,
     c.chnl_name AS 渠道,
     t.`含税销售金额` AS 含税销售金额,
+    t.包装费 as 包装费,
     t.`订单号` AS 订单号
 FROM (
     -- 正常订单
@@ -136,3 +137,4 @@ WHERE t.`订单完成时间` >= STR_TO_DATE(@开始日期, '%Y-%m-%d')
   AND (IFNULL(@机构, '') = '' OR FIND_IN_SET(t.`门店编码` COLLATE utf8mb4_general_ci, @机构) > 0)
   AND (IFNULL(@渠道, '') = '' OR c.chnl_name = @渠道 COLLATE utf8mb4_general_ci)
   AND (IFNULL(@订单号, '') = '' OR t.`订单号` = @订单号 COLLATE utf8mb4_general_ci)
+  AND t.含税销售金额 > 0

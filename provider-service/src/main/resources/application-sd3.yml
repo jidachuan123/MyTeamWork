@@ -38,7 +38,7 @@ sd3:
     - "美团闪购"
     - "淘宝闪购"
     - "03京东到家"
-  cron: "0 12 16 * * ?"
+  cron: "0 25 11 * * ?"
   chnl: ""                    # 渠道：留空=全部渠道；填了只发该渠道（所有截图共用）
   order-no: ""                # 订单号：一般留空（所有截图共用）
   screenshots:
@@ -52,9 +52,9 @@ sd3:
       total-label: "巨野区域线上销售共计"
 
   # 日期：false = 每天自动取「前一天」；true = 固定用下面两个日期
-  use-fixed-date: false
-  start-date: ""
-  end-date: ""
+  use-fixed-date: true
+  start-date: "2026-10-01"
+  end-date: "2026-10-13"
 
   # ---------- 推送渠道（与 SD1/SD2 逻辑一致，两个都填就都发）----------
   mail-to: "591111450@qq.com"                 # 邮件收件人，留空不发邮件
