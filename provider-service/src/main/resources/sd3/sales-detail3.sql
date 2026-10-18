@@ -12,6 +12,10 @@
 --   Java 侧会先做归一化（按中英文逗号切分 + 去空格 + 去重），所以写 '1103011, 1103021' 也可以。
 --   COLLATE 说明：bcm 库的 store_code 是 utf8mb4_general_ci，会话变量跟连接走 utf8mb4_0900_ai_ci，
 --   两边不显式统一会报 Illegal mix of collations，所以这里给列加 COLLATE（实测可用，勿删）。
+--
+-- ★ 2026-10-16 变更（勿删）：
+--   1) 输出新增「包装费」列（供后端按渠道补差用：淘宝闪购 = 分组销售额 + 包装费求和；页面不展示）
+--   2) 过滤 AND t.含税销售金额 > 0：排除售后负数行（经确认：报表只统计正向销售）
 -- ============================================================
 
 SELECT
@@ -137,4 +141,3 @@ WHERE t.`订单完成时间` >= STR_TO_DATE(@开始日期, '%Y-%m-%d')
   AND (IFNULL(@机构, '') = '' OR FIND_IN_SET(t.`门店编码` COLLATE utf8mb4_general_ci, @机构) > 0)
   AND (IFNULL(@渠道, '') = '' OR c.chnl_name = @渠道 COLLATE utf8mb4_general_ci)
   AND (IFNULL(@订单号, '') = '' OR t.`订单号` = @订单号 COLLATE utf8mb4_general_ci)
-  AND t.含税销售金额 > 0

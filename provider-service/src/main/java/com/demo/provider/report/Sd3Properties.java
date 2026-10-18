@@ -3,8 +3,11 @@ package com.demo.provider.report;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 销售详情3（SD3）配置，对应 application-sd3.yml 的 sd3 节点。
@@ -34,6 +37,15 @@ public class Sd3Properties {
 
     /** 渠道下拉选项（顺序即表格中渠道分组的展示顺序） */
     private List<String> chnlOptions = new ArrayList<>();
+
+    /**
+     * 渠道每单补差（2026-10-16 新增，单位：元/单）：最终销售额 = 分组销售额 + 订单数 × 该值。
+     * ★ yml 里 key 必须写成 "[渠道名]"（英文方括号 + 引号）——Spring Boot 的 Map 绑定规则：
+     *   不加方括号时中文会被吞掉（实测「美团闪购」→空），补差会静默失效。
+     *   渠道名与 chnl_name 完全一致，如 [美团闪购] / [昂捷到家01] / [03京东到家]。
+     * 淘宝闪购不走这里 —— 它的补差 = 该组「包装费」列求和（固定逻辑，写在 SalesDetail3Service）。
+     */
+    private Map<String, BigDecimal> chnlPerOrderFee = new LinkedHashMap<>();
 
     /** 定时任务 cron（默认每天 8:35，避开 SD1/SD2 的 8:29） */
     private String cron = "0 35 8 * * ?";
@@ -204,6 +216,14 @@ public class Sd3Properties {
 
     public void setChnlOptions(List<String> chnlOptions) {
         this.chnlOptions = chnlOptions;
+    }
+
+    public Map<String, BigDecimal> getChnlPerOrderFee() {
+        return chnlPerOrderFee;
+    }
+
+    public void setChnlPerOrderFee(Map<String, BigDecimal> chnlPerOrderFee) {
+        this.chnlPerOrderFee = chnlPerOrderFee;
     }
 
     public String getCron() {

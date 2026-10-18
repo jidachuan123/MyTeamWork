@@ -41,11 +41,19 @@ import java.util.TreeMap;
  *   - 每个门店一个「块」：序号 / 门店编码 / 门店名称 三列纵向合并，覆盖明细行 + 合计行（合计行左侧直达最左边）
  *   - 一个门店下存在多个渠道 → 该门店底部追加一行「合计」；单渠道不追加
  *   - 全表最后一行「总计」：左侧 4 列（序号/编码/名称/平台）合并成一个大格，文案 = sd3.total-label
+ *
+ * ★ 2026-10-16 新增「渠道销售额补差」：分组（门店+渠道）最终销售额 = 求和销售额 + 补差
+ *     淘宝闪购   → + 该组「包装费」列求和（SQL 输出包装费列）
+ *     美团闪购等 → + 该组订单数 × 每单补差值（sd3.chnl-per-order-fee，默认 1 元/单）
+ *   补差在分组层叠加；合计行 / 总计行 / 客单价均基于补差后的销售额，页面与截图天然一致。
  */
 @Service
 public class SalesDetail3Service {
 
     private static final Logger log = LoggerFactory.getLogger(SalesDetail3Service.class);
+
+    /** 淘宝闪购：补差 = 该组「包装费」列求和（固定逻辑；渠道名与 chnl_name 完全一致） */
+    private static final String PACKAGE_FEE_CHNL = "淘宝闪购";
 
     @Autowired
     @Qualifier("sd3JdbcTemplate")
@@ -154,9 +162,11 @@ public class SalesDetail3Service {
 
     // ==================== 聚合 ====================
 
-    /** 一个分组的累加器：销售额求和 + 订单号去重计数 */
+    /** 一个分组的累加器：销售额求和 + 包装费求和 + 订单号去重计数 */
     private static class Agg {
         BigDecimal amt = BigDecimal.ZERO;
+        /** 包装费求和（2026-10-16：淘宝闪购的补差来源） */
+        BigDecimal pkg = BigDecimal.ZERO;
         Set<String> orders = new LinkedHashSet<>();
     }
 
@@ -182,6 +192,7 @@ public class SalesDetail3Service {
             Map<String, Agg> chnlMap = byStore.computeIfAbsent(code, k -> new LinkedHashMap<>());
             Agg a = chnlMap.computeIfAbsent(ch, k -> new Agg());
             a.amt = a.amt.add(amt);
+            a.pkg = a.pkg.add(dec(r.get("包装费")));
             if (!orderNo.isEmpty()) {
                 a.orders.add(orderNo);
             }
@@ -209,12 +220,14 @@ public class SalesDetail3Service {
             for (int i = 0; i < chnls.size(); i++) {
                 String ch = chnls.get(i);
                 Agg a = chnlMap.get(ch);
-                storeAmt = storeAmt.add(a.amt);
+                // 2026-10-16 补差：淘宝闪购 += 包装费求和；配置渠道 += 订单数 × 每单补差值
+                BigDecimal finalAmt = a.amt.add(adjustAmt(ch, a.pkg, a.orders.size()));
+                storeAmt = storeAmt.add(finalAmt);
                 storeOrders.addAll(a.orders);
                 // 首行带合并单元格（span=块行数），其余行 span=0（前端/截图不输出左侧三列）
                 int span = (i == 0) ? blockRows : 0;
                 rows.add(new Sd3Row(storeSeq, code, storeName.get(code), ch,
-                        a.amt, a.orders.size(), divide(a.amt, a.orders.size()), "detail", span));
+                        finalAmt, a.orders.size(), divide(finalAmt, a.orders.size()), "detail", span));
             }
 
             // 门店下多渠道才追加合计行（单渠道时合计等于自身，没有意义）
@@ -233,6 +246,27 @@ public class SalesDetail3Service {
         total.setTotalLabel(props.getTotalLabel());
 
         return new Sd3Result(rows, total);
+    }
+
+    /**
+     * 分组销售额补差（2026-10-16 新增）。
+     *   淘宝闪购 → 补差 = 该组「包装费」列求和（数据来自 SQL 输出的包装费列）
+     *   配置渠道 → 补差 = 该组订单数 × 每单补差值（sd3.chnl-per-order-fee，元/单）
+     *   其余渠道 → 不补差（返回 0）
+     */
+    private BigDecimal adjustAmt(String chnl, BigDecimal pkgSum, int orderCnt) {
+        if (PACKAGE_FEE_CHNL.equals(chnl)) {
+            return pkgSum;
+        }
+        Map<String, BigDecimal> fees = props.getChnlPerOrderFee();
+        if (fees == null || fees.isEmpty() || orderCnt <= 0) {
+            return BigDecimal.ZERO;
+        }
+        BigDecimal per = fees.get(chnl);
+        if (per == null) {
+            return BigDecimal.ZERO;
+        }
+        return per.multiply(BigDecimal.valueOf(orderCnt));
     }
 
     /** 渠道排序：按 yml 里 chnl-options 的顺序；未配置的排最后（按名称） */
@@ -316,7 +350,7 @@ public class SalesDetail3Service {
         private String storeName;
         /** 平台（渠道）；合计行显示「合计」，总计行显示「总计」 */
         private String chnl;
-        /** 销售额（含税销售金额合计） */
+        /** 销售额（分组含税销售金额合计 + 渠道补差；2026-10-16 起含补差） */
         private BigDecimal saleAmt;
         /** 订单数（去重后的订单号个数） */
         private int orderCnt;
