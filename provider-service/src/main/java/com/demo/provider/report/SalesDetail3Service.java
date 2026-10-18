@@ -46,6 +46,10 @@ import java.util.TreeMap;
  *     淘宝闪购   → + 该组「包装费」列求和（SQL 输出包装费列）
  *     美团闪购等 → + 该组订单数 × 每单补差值（sd3.chnl-per-order-fee，默认 1 元/单）
  *   补差在分组层叠加；合计行 / 总计行 / 客单价均基于补差后的销售额，页面与截图天然一致。
+ *
+ * ★ 2026-10-18 订单数口径（与金额分开）：
+ *     订单数 = 「含税销售金额 &gt; 0」的订单号去重个数；
+ *     售后单在 SQL 里金额为负，不计入订单数；但销售额仍照常累加负数（保留冲减）。
  */
 @Service
 public class SalesDetail3Service {
@@ -167,6 +171,10 @@ public class SalesDetail3Service {
         BigDecimal amt = BigDecimal.ZERO;
         /** 包装费求和（2026-10-16：淘宝闪购的补差来源） */
         BigDecimal pkg = BigDecimal.ZERO;
+        /**
+         * 订单号集合（去重后 size 即订单数）。
+         * ★ 只收「含税销售金额 > 0」的订单 —— 售后负数单不算有效订单（2026-10-18）。
+         */
         Set<String> orders = new LinkedHashSet<>();
     }
 
@@ -193,7 +201,10 @@ public class SalesDetail3Service {
             Agg a = chnlMap.computeIfAbsent(ch, k -> new Agg());
             a.amt = a.amt.add(amt);
             a.pkg = a.pkg.add(dec(r.get("包装费")));
-            if (!orderNo.isEmpty()) {
+            // 订单数只统计「含税销售金额 > 0」的单：
+            //   售后单在 SQL 里金额取负（如 -0.70），不算有效订单，不进入订单数；
+            //   金额仍照常累加（保留负数冲减），所以这里只影响订单数，不动销售额基数。
+            if (!orderNo.isEmpty() && amt.compareTo(BigDecimal.ZERO) > 0) {
                 a.orders.add(orderNo);
             }
         }
@@ -352,7 +363,7 @@ public class SalesDetail3Service {
         private String chnl;
         /** 销售额（分组含税销售金额合计 + 渠道补差；2026-10-16 起含补差） */
         private BigDecimal saleAmt;
-        /** 订单数（去重后的订单号个数） */
+        /** 订单数（含税销售金额 > 0 的订单号，去重后的个数） */
         private int orderCnt;
         /** 客单价 = 销售额 ÷ 订单数（后端算好，页面与截图共用） */
         private BigDecimal avgPrice;
