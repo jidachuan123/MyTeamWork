@@ -97,14 +97,15 @@ report:
       mail-to: "1137851593@qq.com"   # 主收件人
       wecom-webhook: "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=d75971ba-020f-41b0-b465-90b200e50803"
       # 企微摘要文案（发图前那段文字）。留空 = 用代码默认模板；填了完全按你写的发。
+      # 摘要以 text 消息发送（微信客户端也能正常显示），正常写纯文本即可；写了 markdown 语法会被自动清洗掉
       # 支持占位符：{date} 报表日期、{cur} 本期区间、{cmp} 环比区间、{yoy} 同比区间、{range} 报表范围
-      # 单行写法（换行写 \n）：wecom-digest: "**佳和销售日报 {date}**\n> 本期：{cur}\n> 同比：{yoy}"
+      # 单行写法（换行写 \n）：wecom-digest: "佳和销售日报 {date}\n本期：{cur}\n同比：{yoy}"
       # 多行写法（去掉注释后，注意缩进对齐）：
       #   wecom-digest: |
-      #     **佳和销售日报 {date}**
-      #     > 本期：{cur}
-      #     > 环比：{cmp}
-      #     > 同比：{yoy}
+      #     佳和销售日报 {date}
+      #     本期：{cur}
+      #     环比：{cmp}
+      #     同比：{yoy}
       wecom-digest: "巨野销售报表:"
       use-fixed-date: false          # false=按「前一天/前两天/去年同日」推算（默认）；改成 true 则启用下方固定日期
       start-date: "2026-09-01"                 # 本期开始，如 "2026-09-30"

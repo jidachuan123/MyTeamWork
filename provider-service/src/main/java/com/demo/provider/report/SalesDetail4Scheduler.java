@@ -149,11 +149,12 @@ public class SalesDetail4Scheduler {
                       .replace("{org}", orgText);
         }
 
-        return "**配送调拨汇总表 " + date + "**\n"
-                + "> 记账日期：" + accRange + "\n"
-                + "> 环比日期：" + cmpRange + "\n"
-                + "> 同比日期：" + yoyRange + "\n"
-                + "> 发货机构：" + orgText;
+        // 纯文本模板：企微摘要走 text 消息（markdown 在微信客户端打不开）
+        return "配送调拨汇总表 " + date + "\n"
+                + "记账日期：" + accRange + "\n"
+                + "环比日期：" + cmpRange + "\n"
+                + "同比日期：" + yoyRange + "\n"
+                + "发货机构：" + orgText;
     }
 
     private static String range(String s, String e) {

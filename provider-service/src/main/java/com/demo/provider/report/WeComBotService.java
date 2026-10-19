@@ -28,8 +28,14 @@ import java.util.List;
  *
  * 官方文档约束：
  *   - image 消息：仅支持 JPG/PNG，图片 ≤ 2MB，需同时传 base64 与原始文件 md5
+ *   - text  消息：内容 ≤ 2048 字节
  *   - markdown 消息：内容 ≤ 4096 字节
  *   - 频率限制：每个机器人每分钟最多 20 条
+ *
+ * ⚠ 消息类型与「微信」客户端兼容性（2026-10-19 线上踩坑）：
+ *   群机器人发的 markdown 消息，在「企业微信」里显示正常，但群聊被转发/在「微信」里查看时
+ *   会被拦成一条灰条「暂不支持此消息类型，点击前往企业微信查看」。
+ *   text 与 image 在微信里都能正常展示 —— 所以摘要统一走 text（markdown 语法必须先清洗成纯文本）。
  *
  * 用法：在群里添加「群机器人」→ 复制 Webhook 地址 → 配到 report.daily.main.wecom-webhook
  */
@@ -41,13 +47,16 @@ public class WeComBotService {
     /** 企微 image 消息体积上限（2MB），超过要压缩后再发，否则返回 45009 */
     private static final int MAX_IMAGE_BYTES = 2 * 1024 * 1024;
 
+    /** 企微 text 消息内容上限（2048 字节，UTF-8 下约 680 个汉字） */
+    private static final int MAX_TEXT_BYTES = 2048;
+
     private final ObjectMapper mapper = new ObjectMapper();
 
     /**
-     * 推送一组截图：先发一条 markdown 摘要（标题 + 报表范围 + 日期口径），再逐张发图片。
+     * 推送一组截图：先发一条 text 摘要（标题 + 报表范围 + 日期口径），再逐张发图片。
      *
      * @param webhook 群机器人 Webhook 地址；为空则直接跳过
-     * @param digest  摘要文本（markdown），为空则只发图片
+     * @param digest  摘要文本（可含 markdown 语法，发送前会清洗成纯文本），为空则只发图片
      * @param pngPaths 截图文件绝对路径列表
      * @return 可读的执行结果
      */
@@ -58,9 +67,9 @@ public class WeComBotService {
         String url = webhook.trim();
         StringBuilder sb = new StringBuilder();
 
-        // ① 摘要（可选）
+        // ① 摘要（可选）：必须是 text，markdown 在微信客户端打不开
         if (digest != null && !digest.trim().isEmpty()) {
-            sb.append("摘要 -> ").append(sendMarkdown(url, digest.trim())).append("\n");
+            sb.append("摘要 -> ").append(sendText(url, digest.trim())).append("\n");
             sleepQuietly(400);   // 简单退让，避免触发 20 条/分钟限流
         }
 
@@ -87,7 +96,10 @@ public class WeComBotService {
         return sb.toString();
     }
 
-    /** 发送 markdown 文本消息 */
+    /**
+     * 发送 markdown 文本消息。
+     * ⚠ 仅企业微信客户端可见：在「微信」里查看会显示"暂不支持此消息类型"。群推送摘要请用 sendText。
+     */
     public String sendMarkdown(String webhook, String content) {
         try {
             ObjectNode root = mapper.createObjectNode();
@@ -120,16 +132,62 @@ public class WeComBotService {
         }
     }
 
-    /** 纯文本消息（备用，比如只推一句结论） */
+    /**
+     * 发送纯文本消息。
+     * 之所以用 text 而不是 markdown：text / image 在「微信」客户端都能正常展示，
+     * markdown 只认企业微信客户端，转出去会变成"暂不支持此消息类型"。
+     * 传入内容里的 markdown 语法会先清洗成纯文本（否则屏幕上会看到 ** 和 > 这些符号）。
+     */
     public String sendText(String webhook, String content) {
         try {
+            String plain = toPlainText(content);
+            if (plain.isEmpty()) {
+                return "未发送：文本内容为空";
+            }
+            if (plain.getBytes(StandardCharsets.UTF_8).length > MAX_TEXT_BYTES) {
+                log.warn("[企微机器人] 文本超过 {} 字节，已截断", MAX_TEXT_BYTES);
+                plain = truncateUtf8(plain, MAX_TEXT_BYTES - 3) + "...";
+            }
             ObjectNode root = mapper.createObjectNode();
             root.put("msgtype", "text");
-            root.putObject("text").put("content", content);
+            root.putObject("text").put("content", plain);
             return call(webhook, mapper.writeValueAsString(root));
         } catch (Exception e) {
             return "发送异常：" + e.getMessage();
         }
+    }
+
+    /**
+     * markdown → 纯文本：去掉加粗/斜体/行内代码、引用符号、标题井号、HTML 标签，链接只留文字。
+     * 目的：text 消息不做渲染，不清洗就会原样显示 **标题**、&gt; 本期：xxx。
+     * 改为 text 后，历史配置里写的 markdown 文案仍可直接用（自动降级为纯文本）。
+     */
+    static String toPlainText(String s) {
+        if (s == null) {
+            return "";
+        }
+        String t = s;
+        t = t.replaceAll("(?m)^\\s*>+\\s?", "· ");                 // > 引用  → · 
+        t = t.replaceAll("(?m)^\\s*#{1,6}\\s+", "");               // # 标题（要求 # 后有空格，避免误伤 "#1 店"）
+        t = t.replaceAll("(?m)^\\s*(?:-{3,}|\\*{3,}|_{3,})\\s*$", ""); // 分隔线直接删掉
+        t = t.replaceAll("<[^>]{1,80}>", "");                      // <font color="info"> 等标签
+        t = t.replaceAll("!?\\[([^\\]]*)]\\(([^)]*)\\)", "$1 $2"); // [文字](url) → 文字 url
+        t = t.replace("**", "").replace("~~", "").replace("`", "");
+        t = t.replaceAll("(?<!\\w)__(.+?)__(?!\\w)", "$1");        // __斜体__（避免误伤 a__b 这类标识）
+        return t.trim();
+    }
+
+    /** 按 UTF-8 字节数安全截断，不切半个汉字 */
+    private static String truncateUtf8(String s, int maxBytes) {
+        byte[] b = s.getBytes(StandardCharsets.UTF_8);
+        if (b.length <= maxBytes) {
+            return s;
+        }
+        int end = Math.max(0, maxBytes);
+        while (end > 0 && (b[end] & 0xC0) == 0x80) {   // 0x80~0xBF 是后续字节，回退到字符首字节
+            end--;
+        }
+        return new String(b, 0, end, StandardCharsets.UTF_8);
     }
 
     /** 统一发 POST 并解析 errcode；errcode=0 视为成功 */

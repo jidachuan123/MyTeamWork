@@ -190,17 +190,18 @@ public class SalesDetail3Scheduler {
                       .replace("{avg}", avg);
         }
 
+        // 纯文本模板：企微摘要走 text 消息（markdown 在微信客户端打不开）
         if (hasAmount) {
-            return "**销售详情3 " + date + "**\n"
-                    + "> 机构：" + orgText + "\n"
-                    + "> 渠道：" + chnlText + "\n"
-                    + "> 销售额：" + amt + "\n"
-                    + "> 订单数：" + orders + "\n"
-                    + "> 客单价：" + avg;
+            return "销售详情3 " + date + "\n"
+                    + "机构：" + orgText + "\n"
+                    + "渠道：" + chnlText + "\n"
+                    + "销售额：" + amt + "\n"
+                    + "订单数：" + orders + "\n"
+                    + "客单价：" + avg;
         }
-        return "**销售详情3 " + date + "**\n"
-                + "> 机构：" + orgText + "\n"
-                + "> 渠道：" + chnlText;
+        return "销售详情3 " + date + "\n"
+                + "机构：" + orgText + "\n"
+                + "渠道：" + chnlText;
     }
 
     /** 配置值为空时回退推算值并打 WARN（与 SD1/SD2 同样的「不静默」原则） */

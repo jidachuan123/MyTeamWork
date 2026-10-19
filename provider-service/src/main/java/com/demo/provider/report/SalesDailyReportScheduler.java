@@ -175,11 +175,12 @@ public class SalesDailyReportScheduler {
                       .replace("{range}", desc);
         }
 
-        return "**销售详情日报 " + mailDate + "**\n"
-                + "> 报表范围：" + desc + "\n"
-                + "> 本期：" + cur + "\n"
-                + "> 环比：" + cmp + "\n"
-                + "> 同比：" + yoy;
+        // 纯文本模板：企微摘要走 text 消息（markdown 在微信客户端打不开）
+        return "销售详情日报 " + mailDate + "\n"
+                + "报表范围：" + desc + "\n"
+                + "本期：" + cur + "\n"
+                + "环比：" + cmp + "\n"
+                + "同比：" + yoy;
     }
 
     /**

@@ -63,7 +63,8 @@ public class ReportDailyProperties {
         /**
          * 企业微信推送的「摘要文案」（2026-10-12 新增）。
          * 留空 = 用代码默认模板（标题 + 报表范围 + 本期/环比/同比）。
-         * 填了 = 完全按你写的原文发送（markdown 语法可用：**加粗** / > 引用）。
+         * 填了 = 完全按你写的原文发送。
+         * 摘要以 text 消息发送（微信客户端也能看），写纯文本即可；markdown 语法会被自动清洗成纯文本。
          *
          * 支持占位符（发消息时自动替换，不想用可以不写）：
          *   {date} 报表日期（固定日期模式取配置的结束日期，否则取本期日期）
@@ -75,9 +76,9 @@ public class ReportDailyProperties {
          * yml 多行写法（推荐，换行用 \n 会很难读）：
          * <pre>
          * wecom-digest: |
-         *   **销售日报 {date}**
-         *   > 本期：{cur}
-         *   > 环比：{cmp}
+         *   销售日报 {date}
+         *   本期：{cur}
+         *   环比：{cmp}
          * </pre>
          */
         private String wecomDigest = "";
