@@ -70,8 +70,8 @@ sd3:
   end-date: "2026-10-13"
 
   # ---------- 推送渠道（与 SD1/SD2 逻辑一致，两个都填就都发）----------
-  mail-to: "591111450@qq.com"                 # 邮件收件人，留空不发邮件
-  wecom-webhook: "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=0fe8f6c9-8ce2-4a57-bc5e-759c711fd729"           # 企业微信机器人 Webhook，留空不推企微
+  mail-to: ""                 # 邮件收件人，留空不发邮件
+  wecom-webhook: "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=995c03b0-ceb5-4b78-91fb-7648a606dc83"           # 企业微信机器人 Webhook，留空不推企微
   # 企微摘要文案，留空用默认模板；支持占位符 {date} {org} {chnl} {amt} {orders} {avg}
   wecom-digest: "线上销售报表"
 
