@@ -813,13 +813,31 @@ public class SalesDailyReportService {
 
     // ==================== 截图 ====================
 
+    /** 默认 1900px 宽（SD1/SD2 原有行为，未改变） */
     boolean screenshot(String htmlPath, String pngPath, int rowCount) {
+        return screenshot(htmlPath, pngPath, rowCount, 1900);
+    }
+
+    /**
+     * 按指定画布宽度截图（2026-10-26 新增，供销售详情3 竖版使用）。
+     *
+     * ★ 为什么要宽度参数：企业微信/微信里看图是按「宽度自适应」缩放的。1900px 宽的横图
+     *   在手机竖屏（约 390pt）里会被缩到 1/5，14px 的字实际只剩 3px 左右，领导反馈看不清、
+     *   上下还都是黑边。把画布压到 680px 后，同样的字号在手机上能放大近 3 倍。
+     * ★ 只影响视口宽度：高度仍按行数估算，但窄画布字号更大、门店名会折行，行高按 76px
+     *   估（宁大勿小），多出来的底部白底由 trimBottomWhitespace 自动裁掉。
+     * ★ SD1/SD2 仍走 3 参数版本（1900px），行为完全不变。
+     */
+    boolean screenshot(String htmlPath, String pngPath, int rowCount, int width) {
         String browser = resolveBrowser();
         if (browser == null) {
             return false;
         }
-        // 动态计算截图高度：标题区（含三组日期）+ 表头 + 行数×行高，保证整页截全
-        int height = Math.max(640, 300 + rowCount * 30);
+        int widthPx = width > 0 ? width : 1900;
+        // 动态计算截图高度：标题区（含日期/机构/渠道）+ 表头 + 行数×行高，保证整页截全
+        int height = widthPx < 1200
+                ? Math.min(16000, Math.max(900, 420 + rowCount * 76))
+                : Math.max(640, 300 + rowCount * 30);
         // 每次用全新的临时 user-data-dir：既避免 profile 锁定，也避免与用户桌面已开
         // 的 Chrome 主实例冲突（否则 headless 会把任务委托给主实例然后立即退出）
         Path profileDir = null;
@@ -841,10 +859,10 @@ public class SalesDailyReportService {
             log.warn("[销售日报] 创建临时 user-data-dir 失败，使用默认目录: {}", e.getMessage());
             chromeArgs.add("--user-data-dir=" + new File(outputDir, "chrome-profile").getAbsolutePath());
         }
-        chromeArgs.add("--window-size=1900," + height);
+        chromeArgs.add("--window-size=" + widthPx + "," + height);
         chromeArgs.add("--screenshot=" + new File(pngPath).getAbsolutePath());
         chromeArgs.add("file:///" + new File(htmlPath).getAbsolutePath().replace("\\", "/"));
-        log.info("[销售日报] 截图命令: {}", String.join(" ", chromeArgs));
+        log.info("[销售日报] 截图命令（画布 {}×{}）: {}", widthPx, height, String.join(" ", chromeArgs));
         Process process = null;
         long start = System.currentTimeMillis();
         try {

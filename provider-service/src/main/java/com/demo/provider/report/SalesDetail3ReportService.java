@@ -96,8 +96,9 @@ public class SalesDetail3ReportService {
         }
 
         String pngPath = outputDir + "/" + name + ".png";
-        boolean ok = reportService.screenshot(htmlPath, pngPath, rows.size());
-        log.info("[销售详情3] 截图{}：{}（{} 行）", ok ? "成功" : "失败", pngPath, rows.size());
+        // 竖版 680px 宽截图（2026-10-26）：方便在微信/企业微信手机端直接阅读
+        boolean ok = reportService.screenshot(htmlPath, pngPath, rows.size(), SCREENSHOT_WIDTH);
+        log.info("[销售详情3] 截图{}：{}（{} 行，画布宽 {}px）", ok ? "成功" : "失败", pngPath, rows.size(), SCREENSHOT_WIDTH);
         return ok ? pngPath : null;
     }
 
@@ -107,6 +108,13 @@ public class SalesDetail3ReportService {
     }
 
     // ==================== HTML ====================
+    //
+    // ★ 2026-10-26 竖版重排（方案 B）：本 HTML 只用于「截图」，页面 SalesDetail3.vue 完全不动。
+    //   原因：企业微信/微信按宽度自适应缩放图片，1900×718 的横图在手机竖屏里字只剩 3px、
+    //   上下黑边 697px。把画布压到 680px、字号放大到 17px 后，手机上字号约 10px，
+    //   领导竖屏即可阅读，7 列全部保留。
+    //   列宽合计 656px = 680 - .page 左右 padding 24px，table-layout:fixed 下不会撑破。
+    private static final int SCREENSHOT_WIDTH = 680;
 
     private String buildHtml(String startDate, String endDate, String orgCode, String chnl,
                              List<SalesDetail3Service.Sd3Row> rows, SalesDetail3Service.Sd3Row total,
@@ -115,15 +123,16 @@ public class SalesDetail3ReportService {
         StringBuilder sb = new StringBuilder(8192);
         sb.append("<!DOCTYPE html>\n<html lang=\"zh-CN\">\n<head>\n<meta charset=\"UTF-8\">\n")
           .append("<title>销售详情3</title>\n<style>\n")
-          .append("body{margin:0;padding:0;background:#fff;font-family:'Microsoft YaHei','Segoe UI',sans-serif;font-size:12px;color:#333;}\n")
-          .append(".page{padding:16px 20px 24px;}\n")
-          .append(".header{text-align:center;padding:14px 0 12px;border-bottom:1px solid #e8e8e8;background:#fff;}\n")
-          .append(".header h2{margin:0 0 8px;font-size:18px;font-weight:700;color:#b71c1c;letter-spacing:1px;}\n")
-          .append(".date{display:inline-block;font-size:15px;padding:4px 12px;border-radius:4px;margin:0 6px;background:#fff;color:#d32f2f;font-weight:700;}\n")
-          .append("table{width:100%;border-collapse:collapse;margin-top:12px;white-space:nowrap;}\n")
-          .append("th{padding:7px 4px;border:2px solid #000;text-align:center;background:#fff;color:#333;font-weight:700;font-size:13px;}\n")
-          .append("td{padding:5px 3px;border:1px solid #000;text-align:center;font-size:14px;font-variant-numeric:tabular-nums;line-height:1.25;}\n")
-          .append(".col-name{text-align:center !important;vertical-align:middle;}\n")
+          .append("body{margin:0;padding:0;background:#fff;font-family:'Microsoft YaHei','Segoe UI',sans-serif;font-size:17px;color:#333;}\n")
+          .append(".page{padding:12px 12px 16px;}\n")
+          .append(".header{text-align:center;padding:8px 0 10px;border-bottom:1px solid #e8e8e8;background:#fff;}\n")
+          .append(".header h2{margin:0 0 8px;font-size:22px;font-weight:700;color:#b71c1c;letter-spacing:1px;}\n")
+          .append(".date{display:inline-block;font-size:15px;padding:3px 8px;border-radius:4px;margin:2px 3px;background:#fff;color:#d32f2f;font-weight:700;line-height:1.4;}\n")
+          .append("table{width:100%;border-collapse:collapse;margin-top:10px;table-layout:fixed;}\n")
+          .append("th,td{box-sizing:border-box;overflow-wrap:break-word;}\n")
+          .append("th{padding:9px 2px;border:2px solid #000;text-align:center;background:#fff;color:#333;font-weight:700;font-size:16px;}\n")
+          .append("td{padding:8px 2px;border:1px solid #000;text-align:center;font-size:17px;font-variant-numeric:tabular-nums;line-height:1.2;}\n")
+          .append(".col-name{text-align:center !important;vertical-align:middle;white-space:normal;}\n")
           .append("tr.subtotal td{background:#B8E0DC !important;border-top:2px solid #000;border-bottom:2px solid #000;color:#1a1a1a !important;font-weight:700;}\n")
           .append("tr.total td{background:#F2E1A6 !important;border-top:2px solid #000;border-bottom:3px double #000;color:#1a1a1a !important;font-weight:800;}\n")
           .append("</style>\n</head>\n<body>\n<div class=\"page\">\n")
@@ -133,14 +142,22 @@ public class SalesDetail3ReportService {
           .append("<span class=\"date\">机构：").append(orgCode == null || orgCode.trim().isEmpty() ? "全部" : orgCode).append("</span>\n")
           .append("<span class=\"date\">渠道：").append(chnl == null || chnl.trim().isEmpty() ? "全部" : chnl).append("</span>\n")
           .append("</div>\n")
-          .append("<table>\n<thead>\n<tr>")
-          .append("<th style=\"width:5%\">序号</th>")
-          .append("<th style=\"width:12%\">门店编码</th>")
-          .append("<th style=\"width:26%\">门店名称</th>")
-          .append("<th style=\"width:15%\">平台</th>")
-          .append("<th style=\"width:15%\">销售额</th>")
-          .append("<th style=\"width:12%\">订单数</th>")
-          .append("<th style=\"width:15%\">客单价</th>")
+          .append("<table>\n<colgroup>")
+          .append("<col style=\"width:40px\">")
+          .append("<col style=\"width:82px\">")
+          .append("<col style=\"width:194px\">")
+          .append("<col style=\"width:92px\">")
+          .append("<col style=\"width:106px\">")
+          .append("<col style=\"width:58px\">")
+          .append("<col style=\"width:84px\">")
+          .append("</colgroup>\n<thead>\n<tr>")
+          .append("<th>序号</th>")
+          .append("<th>门店编码</th>")
+          .append("<th>门店名称</th>")
+          .append("<th>平台</th>")
+          .append("<th>销售额</th>")
+          .append("<th>订单数</th>")
+          .append("<th>客单价</th>")
           .append("</tr>\n</thead>\n<tbody>\n");
 
         if (rows.isEmpty()) {
