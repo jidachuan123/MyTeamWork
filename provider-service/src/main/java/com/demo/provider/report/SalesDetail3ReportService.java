@@ -139,7 +139,8 @@ public class SalesDetail3ReportService {
           .append("<div class=\"header\">\n")
           .append("<h2>").append(esc(resolveTitle(taskTitle))).append("</h2>\n")
           .append("<span class=\"date\">查询日期：").append(dateText).append("</span>\n")
-          .append("<span class=\"date\">机构：").append(orgCode == null || orgCode.trim().isEmpty() ? "全部" : orgCode).append("</span>\n")
+          // 2026-10-26：机构列表不再显示。一是机构多时（十几个编码）会折成两行、把截图顶部撑高；
+          // 二是这份截图本来就按机构任务分发的，看的人知道是哪个片区。orgCode 仍参与查询，只是不展示。
           .append("<span class=\"date\">渠道：").append(chnl == null || chnl.trim().isEmpty() ? "全部" : chnl).append("</span>\n")
           .append("</div>\n")
           .append("<table>\n<colgroup>")
