@@ -29,6 +29,20 @@ public class SalesDetail4ReportService {
 
     private static final Logger log = LoggerFactory.getLogger(SalesDetail4ReportService.class);
 
+    /**
+     * 截图画布宽度（2026-10-27）。
+     *
+     * ★ 为什么是 1350 而不是原来的 1900：企业微信/微信里看图按「宽度自适应」缩放，
+     *   1900px 的画布缩到手机 390pt 宽只剩 1/4.9，14px 的字实际只有 2.9px。
+     *   1350px 是本表 9 列在 18px 字号下刚好装下的宽度（列宽合计 1318 + 左右 padding 32），
+     *   同样的内容手机上能放大到 5.2px，配合 10px 行内边距，截图在电脑上看也更清晰。
+     * ★ 列宽写死在 buildHtml() 的 colgroup 里，两者必须同步改。
+     */
+    private static final int SCREENSHOT_WIDTH = 1350;
+
+    /** 每行高度估算（td 18px + padding 10px×2 + border，实际约 45px，留余量给机构名折行） */
+    private static final int SCREENSHOT_ROW_HEIGHT = 56;
+
     @Autowired
     private SalesDetail4Service sd4Service;
 
@@ -94,8 +108,11 @@ public class SalesDetail4ReportService {
         }
 
         String pngPath = outputDir + "/" + name + ".png";
-        boolean ok = reportService.screenshot(htmlPath, pngPath, rows.size());
-        log.info("[销售详情4] 截图{}：{}（{} 行）", ok ? "成功" : "失败", pngPath, rows.size());
+        // 2026-10-27：大头像化 —— 画布从 1900 收到 1350（内容刚好装下），字号 14→18、行高加大
+        boolean ok = reportService.screenshot(htmlPath, pngPath, rows.size(),
+                SCREENSHOT_WIDTH, SCREENSHOT_ROW_HEIGHT);
+        log.info("[销售详情4] 截图{}：{}（{} 行，画布 {}px 宽）",
+                ok ? "成功" : "失败", pngPath, rows.size(), SCREENSHOT_WIDTH);
         return ok ? pngPath : null;
     }
 
@@ -115,15 +132,19 @@ public class SalesDetail4ReportService {
         StringBuilder sb = new StringBuilder(8192);
         sb.append("<!DOCTYPE html>\n<html lang=\"zh-CN\">\n<head>\n<meta charset=\"UTF-8\">\n")
           .append("<title>").append(esc(title)).append("</title>\n<style>\n")
-          .append("body{margin:0;padding:0;background:#fff;font-family:'Microsoft YaHei','Segoe UI',sans-serif;font-size:12px;color:#333;}\n")
-          .append(".page{padding:16px 20px 24px;}\n")
-          .append(".header{text-align:center;padding:14px 0 12px;border-bottom:1px solid #e8e8e8;background:#fff;}\n")
-          .append(".header h2{margin:0 0 8px;font-size:18px;font-weight:700;color:#b71c1c;letter-spacing:1px;}\n")
-          .append(".date{display:inline-block;font-size:15px;padding:4px 12px;border-radius:4px;margin:0 6px;background:#fff;color:#d32f2f;font-weight:700;}\n")
-          .append("table{width:100%;border-collapse:collapse;margin-top:12px;white-space:nowrap;}\n")
-          .append("th{padding:7px 4px;border:2px solid #000;text-align:center;background:#fff;color:#333;font-weight:700;font-size:13px;}\n")
-          .append("td{padding:5px 3px;border:1px solid #000;text-align:center;font-size:14px;font-variant-numeric:tabular-nums;line-height:1.25;}\n")
-          .append(".col-name{text-align:center !important;vertical-align:middle;}\n")
+          // ★ 2026-10-27 全表放大：td 14→18px、th 13→17px、行内边距 5→10px、标题 18→26px。
+          //   同时画布从 1900 收到 1350（见 SCREENSHOT_WIDTH），两者配合才既大又不溢出。
+          .append("body{margin:0;padding:0;background:#fff;font-family:'Microsoft YaHei','Segoe UI',sans-serif;font-size:18px;color:#333;}\n")
+          .append(".page{padding:14px 16px 20px;}\n")
+          .append(".header{text-align:center;padding:10px 0 12px;border-bottom:1px solid #e8e8e8;background:#fff;}\n")
+          .append(".header h2{margin:0 0 10px;font-size:26px;font-weight:700;color:#b71c1c;letter-spacing:1px;}\n")
+          .append(".date{display:inline-block;font-size:19px;padding:5px 12px;border-radius:4px;margin:3px 5px;background:#fff;color:#d32f2f;font-weight:700;line-height:1.4;}\n")
+          .append("table{width:100%;border-collapse:collapse;margin-top:10px;table-layout:fixed;}\n")
+          .append("th,td{box-sizing:border-box;white-space:nowrap;}\n")
+          .append("th{padding:12px 4px;border:2px solid #000;text-align:center;background:#fff;color:#333;font-weight:700;font-size:17px;line-height:1.3;}\n")
+          .append("td{padding:10px 4px;border:1px solid #000;text-align:center;font-size:18px;font-variant-numeric:tabular-nums;line-height:1.3;}\n")
+          // 机构名允许折行（个别名字超过 13 字时宁可折两行，也不要用 nowrap 撑破表格）
+          .append(".col-name{text-align:center !important;vertical-align:middle;white-space:normal;}\n")
           .append("td.rate-up .rate-arrow{color:#2e7d32 !important;font-weight:600;}\n")
           .append("td.rate-up .rate-num{color:#1a1a1a;font-weight:600;}\n")
           .append("td.rate-down .rate-arrow{color:#c62828 !important;font-weight:600;}\n")
@@ -138,16 +159,27 @@ public class SalesDetail4ReportService {
           .append("<span class=\"date\">同比日期：").append(yoyText).append("</span>\n")
           .append("<span class=\"date\">发货机构：").append(esc(orgText)).append("</span>\n")
           .append("</div>\n")
-          .append("<table>\n<thead>\n<tr>")
-          .append("<th style=\"width:4%\">序号</th>")
-          .append("<th style=\"width:9%\">发货机构编码</th>")
-          .append("<th style=\"width:19%\">发货机构名称</th>")
-          .append("<th style=\"width:12%\">当日库存金额</th>")
-          .append("<th style=\"width:12%\">发货结算金额</th>")
-          .append("<th style=\"width:13%\">环比发货结算金额</th>")
-          .append("<th style=\"width:13%\">同比发货结算金额</th>")
-          .append("<th style=\"width:9%\">环比增长率</th>")
-          .append("<th style=\"width:9%\">同比增长率</th>")
+          // 列宽合计 1318 = 画布 1350 - .page 左右 padding 32。改这里必须同步 SCREENSHOT_WIDTH。
+          .append("<table>\n<colgroup>")
+          .append("<col style=\"width:52px\">")     // 序号
+          .append("<col style=\"width:120px\">")    // 发货机构编码
+          .append("<col style=\"width:256px\">")    // 发货机构名称
+          .append("<col style=\"width:148px\">")    // 当日库存金额
+          .append("<col style=\"width:148px\">")    // 发货结算金额
+          .append("<col style=\"width:156px\">")    // 环比发货结算金额
+          .append("<col style=\"width:156px\">")    // 同比发货结算金额
+          .append("<col style=\"width:141px\">")    // 环比增长率
+          .append("<col style=\"width:141px\">")    // 同比增长率
+          .append("</colgroup>\n<thead>\n<tr>")
+          .append("<th>序号</th>")
+          .append("<th>发货机构编码</th>")
+          .append("<th>发货机构名称</th>")
+          .append("<th>当日库存金额</th>")
+          .append("<th>发货结算金额</th>")
+          .append("<th>环比发货结算金额</th>")
+          .append("<th>同比发货结算金额</th>")
+          .append("<th>环比增长率</th>")
+          .append("<th>同比增长率</th>")
           .append("</tr>\n</thead>\n<tbody>\n");
 
         if (rows.isEmpty()) {

@@ -813,31 +813,35 @@ public class SalesDailyReportService {
 
     // ==================== 截图 ====================
 
-    /** 默认 1900px 宽（SD1/SD2 原有行为，未改变） */
+    /** 默认 1900px 宽、行高 30px（SD1/SD2 原有行为，未改变） */
     boolean screenshot(String htmlPath, String pngPath, int rowCount) {
-        return screenshot(htmlPath, pngPath, rowCount, 1900);
+        return screenshot(htmlPath, pngPath, rowCount, 1900, 30);
+    }
+
+    /** 只指定画布宽度：窄画布（SD3 竖版 680px）字号大、店名折行，行高按 76px 估 */
+    boolean screenshot(String htmlPath, String pngPath, int rowCount, int width) {
+        return screenshot(htmlPath, pngPath, rowCount, width, (width > 0 && width < 1200) ? 76 : 30);
     }
 
     /**
-     * 按指定画布宽度截图（2026-10-26 新增，供销售详情3 竖版使用）。
+     * 按指定画布宽度 + 行高截图（2026-10-27 新增，供销售详情4 用）。
      *
-     * ★ 为什么要宽度参数：企业微信/微信里看图是按「宽度自适应」缩放的。1900px 宽的横图
-     *   在手机竖屏（约 390pt）里会被缩到 1/5，14px 的字实际只剩 3px 左右，领导反馈看不清、
-     *   上下还都是黑边。把画布压到 680px 后，同样的字号在手机上能放大近 3 倍。
-     * ★ 只影响视口宽度：高度仍按行数估算，但窄画布字号更大、门店名会折行，行高按 76px
-     *   估（宁大勿小），多出来的底部白底由 trimBottomWhitespace 自动裁掉。
-     * ★ SD1/SD2 仍走 3 参数版本（1900px），行为完全不变。
+     * ★ 为什么要宽度参数：企业微信/微信里看图是按「宽度自适应」缩放的。画布越宽，
+     *   手机上的字被缩得越小（1900px 宽时 14px 的字只剩 2.9px）。把画布压到内容实际
+     *   需要的宽度，同样的字号在手机上能放大近一倍。
+     * ★ 为什么要行高参数：字号放大后每行更高，固定按 30px 估算会导致内容被截断。
+     *   行高只需给足（宁大勿小），多出来的底部白底由 trimBottomWhitespace 自动裁掉。
+     * ★ SD1/SD2 走 3 参数版本（1900/30），行为完全不变。
      */
-    boolean screenshot(String htmlPath, String pngPath, int rowCount, int width) {
+    boolean screenshot(String htmlPath, String pngPath, int rowCount, int width, int rowHeight) {
         String browser = resolveBrowser();
         if (browser == null) {
             return false;
         }
         int widthPx = width > 0 ? width : 1900;
+        int rowPx = rowHeight > 0 ? rowHeight : 30;
         // 动态计算截图高度：标题区（含日期/机构/渠道）+ 表头 + 行数×行高，保证整页截全
-        int height = widthPx < 1200
-                ? Math.min(16000, Math.max(900, 420 + rowCount * 76))
-                : Math.max(640, 300 + rowCount * 30);
+        int height = Math.min(16000, Math.max(640, 340 + rowCount * rowPx));
         // 每次用全新的临时 user-data-dir：既避免 profile 锁定，也避免与用户桌面已开
         // 的 Chrome 主实例冲突（否则 headless 会把任务委托给主实例然后立即退出）
         Path profileDir = null;
