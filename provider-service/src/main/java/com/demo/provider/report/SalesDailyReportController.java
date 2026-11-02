@@ -33,6 +33,9 @@ public class SalesDailyReportController {
     @Autowired
     private SalesDetail2ReportService salesDetail2ReportService;
 
+    @Autowired
+    private ReportDailyProperties props;
+
     private static final DateTimeFormatter DTF = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
     /** 报表日期标签：优先用页面本期结束日期，否则回退今天 */
@@ -63,7 +66,9 @@ public class SalesDailyReportController {
      */
     @PostMapping("/report/detail2/trigger")
     public ApiResult<String> triggerDetail2(@RequestBody DailyReportParam req) {
-        String png = salesDetail2ReportService.generateDailyReport(req);
+        // ★ 2026-11-02：与定时任务同一口径 —— 配置 use-fixed-date=true 时，截图不输出「当日库存金额」列
+        boolean hideStock = props.resolveUseFixedDate("sd2");
+        String png = salesDetail2ReportService.generateDailyReport(req, null, null, hideStock);
         if (png == null) {
             return ApiResult.ok("销售详情2 截图生成失败（检查浏览器/输出目录日志）");
         }

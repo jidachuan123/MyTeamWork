@@ -289,4 +289,30 @@ public class ReportDailyProperties {
     public void setSecondary(MailGroup secondary) {
         this.secondary = secondary;
     }
+
+    /**
+     * 按报表类型解析「是否使用固定日期」（2026-11-02 新增）。
+     *
+     * <p>为什么需要：手动触发的「发送截图」接口只知道报表类型（sd1/sd2），不知道属于哪个邮件分组。
+     * 这里按 main → secondary 顺序找第一个配置了该类型截图的分组，返回它的 use-fixed-date；
+     * 都没配就退回 main 的开关。保证「页面手动发图」和「定时发图」用的是同一个口径。
+     *
+     * @param type 报表类型：sd1 / sd2（大小写不敏感，空值按 sd1）
+     */
+    public boolean resolveUseFixedDate(String type) {
+        String target = (type == null || type.trim().isEmpty()) ? "sd1" : type.trim().toLowerCase();
+        for (MailGroup g : new MailGroup[]{main, secondary}) {
+            if (g == null || g.getScreenshots() == null) {
+                continue;
+            }
+            for (ScreenshotTask task : g.getScreenshots()) {
+                String t = (task.getType() == null || task.getType().trim().isEmpty())
+                        ? "sd1" : task.getType().trim().toLowerCase();
+                if (t.equals(target)) {
+                    return g.isUseFixedDate();
+                }
+            }
+        }
+        return main != null && main.isUseFixedDate();
+    }
 }

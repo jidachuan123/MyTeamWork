@@ -145,6 +145,24 @@ public class SalesDetail2ReportService {
      * @return 截图 PNG 路径（失败返回 null）
      */
     public String generateDailyReport(DailyReportParam req, String fileTag, String unionStockCodes) {
+        return generateDailyReport(req, fileTag, unionStockCodes, false);
+    }
+
+    /**
+     * 按页面查询参数生成销售详情2 截图（完整版）。
+     *
+     * @param hideStock 2026-11-02 新增：true = 截图**不输出「当日库存金额」列**。
+     *                  <p>
+     *                  ★ 用途：`report.daily.*.use-fixed-date = true`（补历史 / 指定历史日期截图）时，
+     *                  当日库存金额是「查询当时那一刻的实时库存快照」，跟查询的历史日期没有关系，
+     *                  放在历史报表里会被误读成"那天的库存"，所以整列去掉。
+     *                  ★ false（默认）= 保留该列，行为与以前完全一致。
+     *                  ★ 隐藏该列时，原本「库存金额≤0 的门店不生成行」的规则也一并停用
+     *                  （否则会变成"看不见原因地少了几家店"），此时所有门店都输出。
+     *
+     * @return 截图 PNG 路径（失败返回 null）
+     */
+    public String generateDailyReport(DailyReportParam req, String fileTag, String unionStockCodes, boolean hideStock) {
         // 报表日期标签：取「本期结束日期」；为空时回退今天
         String today = (req.getEndDate() != null && !req.getEndDate().trim().isEmpty())
                 ? req.getEndDate().trim() : LocalDate.now().format(DTF);
@@ -172,7 +190,9 @@ public class SalesDetail2ReportService {
         // 引擎查询只返回有销售的门店；unionStockCodes 指定的门店（如 1104901/1103801）即使无销售
         // 也要出现在截图里（仅机构编码/机构名称/当日库存金额三列，其余列按 NULL=0 处理）。
         // 语义等同 UNION ALL + 按机构编码聚合：引擎已返回的门店不重复追加（防同源库存翻倍）。
-        if (unionStockCodes != null && !unionStockCodes.trim().isEmpty()) {
+        // ★ 2026-11-02：hideStock=true 时不能追加 —— 这些行存在的唯一理由就是"把库存补上"，
+        //   库存列都不输出了，再补就只会多出几行全 0 的空门店。
+        if (!hideStock && unionStockCodes != null && !unionStockCodes.trim().isEmpty()) {
             mergeStockOnlyRows(momData, yoyData, unionStockCodes);
         }
 
@@ -194,8 +214,9 @@ public class SalesDetail2ReportService {
         String tag = (fileTag != null && !fileTag.trim().isEmpty()) ? "-" + fileTag.trim() : "";
         String htmlPath = outputDir + "/sales-detail2-" + today + tag + ".html";
         try {
-            Files.write(Paths.get(htmlPath), buildHtml(q, end, m, mEnd, y, yEnd, rows).getBytes(StandardCharsets.UTF_8));
-            log.info("[销售详情2] HTML 已生成: {}", new File(htmlPath).getAbsolutePath());
+            Files.write(Paths.get(htmlPath), buildHtml(q, end, m, mEnd, y, yEnd, rows, hideStock).getBytes(StandardCharsets.UTF_8));
+            log.info("[销售详情2] HTML 已生成: {}（{}）", new File(htmlPath).getAbsolutePath(),
+                    hideStock ? "固定日期模式：不输出当日库存金额列" : "含当日库存金额列");
         } catch (Exception e) {
             log.error("[销售详情2] 生成 HTML 失败", e);
             return null;
@@ -499,7 +520,7 @@ public class SalesDetail2ReportService {
     // ==================== HTML 生成 ====================
 
     private String buildHtml(String queryDate, String queryDateEnd, String momDate, String momDateEnd,
-                             String yoyDate, String yoyDateEnd, List<StoreRow> rows) {
+                             String yoyDate, String yoyDateEnd, List<StoreRow> rows, boolean hideStock) {
         StringBuilder sb = new StringBuilder(8192);
         sb.append("<!DOCTYPE html>\n<html lang=\"zh-CN\">\n<head>\n<meta charset=\"UTF-8\">\n")
           .append("<title>各店每月销售详情</title>\n<style>\n")
@@ -533,9 +554,11 @@ public class SalesDetail2ReportService {
           .append("<span class=\"date yoy\">同比对比：").append(yoyDate).append(" ~ ").append(yoyDateEnd).append("</span>\n")
           .append("</div></div>\n");
 
-        // 表头（16 列，与前端 SalesDetail2.vue 一致：含当日库存金额）
+        // 表头（15 或 16 列，与前端 SalesDetail2.vue 一致）
+        // ★ 2026-11-02：use-fixed-date=true 时【不输出当日库存金额列】（历史报表里库存无意义）
         sb.append("<table>\n<thead><tr>")
-          .append("<th>机构代码</th><th>机构名称</th><th class=\"c-stock\">当日库存金额</th>")
+          .append("<th>机构代码</th><th>机构名称</th>")
+          .append(hideStock ? "" : "<th class=\"c-stock\">当日库存金额</th>")
           .append("<th class=\"c-sales y\">销售额/元</th><th class=\"c-sales\">同比<br>销售额增长率</th><th class=\"c-sales\">环比<br>销售额增长率</th>")
           .append("<th class=\"c-profit y\">毛利额/元</th><th class=\"c-profit\">同比<br>毛利额增长率</th><th class=\"c-profit\">环比<br>毛利额增长率</th>")
           .append("<th class=\"c-profit y\">毛利率</th>")
@@ -546,7 +569,8 @@ public class SalesDetail2ReportService {
         int idx = 0;
         for (StoreRow r : rows) {
             // 当日库存金额为 0 的门店：不生成行（截图里隐藏），但数据已参与合计/派生计算（与前端 v-show 同源隐藏）
-            if (!r.isSubtotal && r.stockAmount <= 0) continue;
+            // ★ 2026-11-02：hideStock=true 时该列不输出，这条隐藏规则同时失效 —— 否则会"看不见原因地少店"
+            if (!hideStock && !r.isSubtotal && r.stockAmount <= 0) continue;
             idx++;
             if (r.isSubtotal) {
                 sb.append("<tr class=\"subtotal\">");
@@ -557,8 +581,10 @@ public class SalesDetail2ReportService {
             sb.append("<td class=\"col-code\">").append(esc(r.orgCode)).append("</td>");
             // 机构名称
             sb.append("<td class=\"col-org\">").append(esc(r.orgName)).append("</td>");
-            // 当日库存金额
-            appendNumTd(sb, "c-stock", r.stockAmount);
+            // 当日库存金额（use-fixed-date=true 时不输出）
+            if (!hideStock) {
+                appendNumTd(sb, "c-stock", r.stockAmount);
+            }
             // 销售额
             appendNumTd(sb, "c-sales y", r.sales);
             // 同比/环比 销售额增长率

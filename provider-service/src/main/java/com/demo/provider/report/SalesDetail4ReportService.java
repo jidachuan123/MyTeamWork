@@ -40,6 +40,13 @@ public class SalesDetail4ReportService {
      */
     private static final int SCREENSHOT_WIDTH = 1350;
 
+    /**
+     * use-fixed-date=true 时的画布宽度（2026-11-02）：不输出「当日库存金额」列，少一列 148px。
+     * 列宽合计 1170 = 52+120+256+148+156+156+141+141，加左右 padding 32 → 1202。
+     * 画布跟着收窄，手机上字号还能再大一点点。
+     */
+    private static final int SCREENSHOT_WIDTH_NO_STOCK = 1202;
+
     /** 每行高度估算（td 18px + padding 10px×2 + border，实际约 45px，留余量给机构名折行） */
     private static final int SCREENSHOT_ROW_HEIGHT = 56;
 
@@ -82,6 +89,22 @@ public class SalesDetail4ReportService {
                                  String cmpStartDate, String cmpEndDate,
                                  String yoyStartDate, String yoyEndDate,
                                  String outOrgCodes, String fileTag) {
+        // ★ 2026-11-02：库存列是否输出去决于配置 sd4.use-fixed-date
+        //   true  → 不输出「当日库存金额」列（补历史报表时库存是实时快照，没有可比意义）
+        //   false → 保留该列，行为与以前完全一致
+        return generateReport(accStartDate, accEndDate, cmpStartDate, cmpEndDate,
+                yoyStartDate, yoyEndDate, outOrgCodes, fileTag, props.isUseFixedDate());
+    }
+
+    /**
+     * 按指定条件生成截图（完整版）。
+     *
+     * @param hideStock true = 不输出「当日库存金额」列（画布同步收窄到 1202px）
+     */
+    public String generateReport(String accStartDate, String accEndDate,
+                                 String cmpStartDate, String cmpEndDate,
+                                 String yoyStartDate, String yoyEndDate,
+                                 String outOrgCodes, String fileTag, boolean hideStock) {
         try {
             // ★ 自己创建 SD4 的输出目录（不要复用 SD1 的 ensureOutputDir —— 那个建的是
             //   report.daily.output-dir，与 sd4.output-dir 可能不是同一个路径）
@@ -100,8 +123,9 @@ public class SalesDetail4ReportService {
         String htmlPath = outputDir + "/" + name + ".html";
         try {
             Files.write(Paths.get(htmlPath),
-                    buildHtml(result, rows).getBytes(StandardCharsets.UTF_8));
-            log.info("[销售详情4] HTML 已生成: {}", new File(htmlPath).getAbsolutePath());
+                    buildHtml(result, rows, hideStock).getBytes(StandardCharsets.UTF_8));
+            log.info("[销售详情4] HTML 已生成: {}（{}）", new File(htmlPath).getAbsolutePath(),
+                    hideStock ? "固定日期模式：不输出当日库存金额列" : "含当日库存金额列");
         } catch (Exception e) {
             log.error("[销售详情4] 生成 HTML 失败", e);
             return null;
@@ -109,16 +133,19 @@ public class SalesDetail4ReportService {
 
         String pngPath = outputDir + "/" + name + ".png";
         // 2026-10-27：大头像化 —— 画布从 1900 收到 1350（内容刚好装下），字号 14→18、行高加大
+        // 2026-11-02：hideStock 时少一列，画布再收到 1202
+        int canvasWidth = hideStock ? SCREENSHOT_WIDTH_NO_STOCK : SCREENSHOT_WIDTH;
         boolean ok = reportService.screenshot(htmlPath, pngPath, rows.size(),
-                SCREENSHOT_WIDTH, SCREENSHOT_ROW_HEIGHT);
+                canvasWidth, SCREENSHOT_ROW_HEIGHT);
         log.info("[销售详情4] 截图{}：{}（{} 行，画布 {}px 宽）",
-                ok ? "成功" : "失败", pngPath, rows.size(), SCREENSHOT_WIDTH);
+                ok ? "成功" : "失败", pngPath, rows.size(), canvasWidth);
         return ok ? pngPath : null;
     }
 
     // ==================== HTML ====================
 
-    private String buildHtml(SalesDetail4Service.Sd4Result result, List<SalesDetail4Service.Sd4Row> rows) {
+    private String buildHtml(SalesDetail4Service.Sd4Result result, List<SalesDetail4Service.Sd4Row> rows,
+                             boolean hideStock) {
         // ★ 2026-10-16 修复：头部补齐「全部查询条件」——此前只显示记账日期+发货机构，
         //   环比日期/同比日期没截上（用户反馈企微收到的图看不到完整条件）。
         String accText = rangeText(result.getAccStartDate(), result.getAccEndDate());
@@ -158,13 +185,15 @@ public class SalesDetail4ReportService {
           .append("<span class=\"date\">环比日期：").append(cmpText).append("</span>\n")
           .append("<span class=\"date\">同比日期：").append(yoyText).append("</span>\n")
           .append("<span class=\"date\">发货机构：").append(esc(orgText)).append("</span>\n")
-          .append("</div>\n")
-          // 列宽合计 1318 = 画布 1350 - .page 左右 padding 32。改这里必须同步 SCREENSHOT_WIDTH。
-          .append("<table>\n<colgroup>")
+          .append("</div>\n");
+
+        // 列宽：含库存 1318（画布 1350）/ 不含库存 1170（画布 1202）。改这里必须同步上面两个常量。
+        // ★ 2026-11-02：use-fixed-date=true 时不输出「当日库存金额」列
+        sb.append("<table>\n<colgroup>")
           .append("<col style=\"width:52px\">")     // 序号
           .append("<col style=\"width:120px\">")    // 发货机构编码
           .append("<col style=\"width:256px\">")    // 发货机构名称
-          .append("<col style=\"width:148px\">")    // 当日库存金额
+          .append(hideStock ? "" : "<col style=\"width:148px\">")   // 当日库存金额
           .append("<col style=\"width:148px\">")    // 发货结算金额
           .append("<col style=\"width:156px\">")    // 环比发货结算金额
           .append("<col style=\"width:156px\">")    // 同比发货结算金额
@@ -174,7 +203,7 @@ public class SalesDetail4ReportService {
           .append("<th>序号</th>")
           .append("<th>发货机构编码</th>")
           .append("<th>发货机构名称</th>")
-          .append("<th>当日库存金额</th>")
+          .append(hideStock ? "" : "<th>当日库存金额</th>")
           .append("<th>发货结算金额</th>")
           .append("<th>环比发货结算金额</th>")
           .append("<th>同比发货结算金额</th>")
@@ -182,15 +211,17 @@ public class SalesDetail4ReportService {
           .append("<th>同比增长率</th>")
           .append("</tr>\n</thead>\n<tbody>\n");
 
+        int colCount = hideStock ? 8 : 9;
+
         if (rows.isEmpty()) {
-            sb.append("<tr><td colspan=\"9\">当日无数据</td></tr>\n");
+            sb.append("<tr><td colspan=\"").append(colCount).append("\">当日无数据</td></tr>\n");
         } else {
             for (SalesDetail4Service.Sd4Row r : rows) {
                 sb.append("<tr>")
                   .append("<td>").append(r.getSeq()).append("</td>")
                   .append("<td>").append(esc(r.getOutOrgCode())).append("</td>")
                   .append("<td class=\"col-name\">").append(esc(r.getOutOrgName())).append("</td>")
-                  .append("<td>").append(fmt(r.getStockAmt())).append("</td>")
+                  .append(hideStock ? "" : "<td>" + fmt(r.getStockAmt()) + "</td>")
                   .append("<td>").append(fmt(r.getSendAmt())).append("</td>")
                   .append("<td>").append(fmt(r.getCmpAmt())).append("</td>")
                   .append("<td>").append(fmt(r.getYoyAmt())).append("</td>")

@@ -79,6 +79,9 @@ public class SalesDailyReportScheduler {
         // ★ 日期来源：use-fixed-date=true → 用本组配置的固定日期（缺失项逐字段回退推算值）
         //   false（默认）→ 全部按「本期=前一天、环比=前两天、同比=去年同日」推算（原逻辑）
         DailyReportParam fixedReq = group.isUseFixedDate() ? buildFixedParam(group, date, groupName) : null;
+        // ★ 2026-11-02：固定日期模式下，销售详情2 的截图不输出「当日库存金额」列
+        //   （库存是"当前实时快照"，与历史查询日期无关，放在补历史的报表里会误导）
+        boolean hideStock = group.isUseFixedDate();
 
         for (ReportDailyProperties.ScreenshotTask task : group.getScreenshots()) {
             String type = (task.getType() == null) ? "sd1" : task.getType().trim().toLowerCase();
@@ -94,7 +97,7 @@ public class SalesDailyReportScheduler {
                     fixedReq.setDeptLevels("sd2".equals(type) ? "" : "3");
                     fixedReq.setDepartment("");
                     if ("sd2".equals(type)) {
-                        png = salesDetail2ReportService.generateDailyReport(fixedReq, tag, unionStockCodes);
+                        png = salesDetail2ReportService.generateDailyReport(fixedReq, tag, unionStockCodes, hideStock);
                     } else {
                         png = salesDailyReportService.generateDailyReport(fixedReq, tag);
                     }
