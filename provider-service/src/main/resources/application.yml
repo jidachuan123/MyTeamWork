@@ -63,7 +63,7 @@ eureka:
 # ============================================================
 report:
   daily:
-    cron: "0 58 08 * * ?"          # 定时发送时间（cron 表达式，每天上午 8:29）
+    cron: "0 26 08 * * ?"          # 定时发送时间（cron 表达式，每天上午 8:29）
     mail-from: "591111450@qq.com"  # 发件人（需与 spring.mail.username 一致）
     mail-to: "591111450@qq.com"    # 默认收件人兜底（仅手动触发接口用；定时任务收件人看下方 main/secondary）
     chrome-path: ""                # 留空则自动探测 Chrome/Edge 路径
@@ -108,12 +108,12 @@ report:
       #     同比：{yoy}
       wecom-digest: "巨野销售报表:"
       use-fixed-date: false          # false=按「前一天/前两天/去年同日」推算（默认）；改成 true 则启用下方固定日期
-      start-date: "2026-09-01"                 # 本期开始，如 "2026-09-30"
-      end-date: "2026-09-30"                   # 本期结束，如 "2026-09-30"
-      cmp-start-date: "2026-08-01"             # 环比开始，如 "2026-09-29"
-      cmp-end-date: "2026-08-30"               # 环比结束，如 "2026-09-29"
-      yoy-start-date: "2025-09-01"             # 同比开始，如 "2025-09-30"
-      yoy-end-date: "2025-09-30"               # 同比结束，如 "2025-09-30"
+      start-date: "2026-10-01"                 # 本期开始，如 "2026-09-30"
+      end-date: "2026-10-31"                   # 本期结束，如 "2026-09-30"
+      cmp-start-date: "2026-09-01"             # 环比开始，如 "2026-09-29"
+      cmp-end-date: "2026-09-30"               # 环比结束，如 "2026-09-29"
+      yoy-start-date: "2025-10-01"             # 同比开始，如 "2025-09-30"
+      yoy-end-date: "2025-10-31"               # 同比结束，如 "2025-09-30"
       screenshots:
         - type: sd1                # 销售详情1（主图）
           org-code: "1101001"
@@ -131,12 +131,12 @@ report:
       wecom-webhook: "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=87d831dc-64c0-4e4f-bd9f-bedf0db1414c"
       wecom-digest: "菏泽销售报表:"               # 副组文案（占位符同上，留空用默认模板）
       use-fixed-date: false          # 与主邮件互不影响，可单独开关
-      start-date: "2026-09-01"
-      end-date: "2026-09-30"
-      cmp-start-date: "2026-08-01"
-      cmp-end-date: "2026-08-30"
-      yoy-start-date: "2025-09-01"
-      yoy-end-date: "2025-09-30"
+      start-date: "2026-10-01"
+      end-date: "2026-10-31"
+      cmp-start-date: "2026-09-01"
+      cmp-end-date: "2026-09-30"
+      yoy-start-date: "2025-10-01"
+      yoy-end-date: "2025-10-31"
       screenshots:
         - type: sd1                # 销售详情1（机构 1103011）
           org-code: "1103011"
