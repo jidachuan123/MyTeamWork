@@ -93,6 +93,9 @@ public class WeComBotService {
             sleepQuietly(400);
         }
         sb.insert(0, "企业微信推送完成：" + ok + "/" + pngPaths.size() + " 张成功\n");
+        if (ok < pngPaths.size()) {
+            log.warn("[企微机器人] 推送未全部成功：{}/{} 张，逐条结果见返回文案", ok, pngPaths.size());
+        }
         return sb.toString();
     }
 
@@ -107,7 +110,7 @@ public class WeComBotService {
             root.putObject("markdown").put("content", content);
             return call(webhook, mapper.writeValueAsString(root));
         } catch (Exception e) {
-            return "发送异常：" + e.getMessage();
+            return fail("markdown", e);
         }
     }
 
@@ -128,7 +131,7 @@ public class WeComBotService {
             img.put("md5", md5);
             return call(webhook, mapper.writeValueAsString(root));
         } catch (Exception e) {
-            return "发送异常：" + e.getMessage();
+            return fail("image(" + png.getName() + ")", e);
         }
     }
 
@@ -153,7 +156,7 @@ public class WeComBotService {
             root.putObject("text").put("content", plain);
             return call(webhook, mapper.writeValueAsString(root));
         } catch (Exception e) {
-            return "发送异常：" + e.getMessage();
+            return fail("text", e);
         }
     }
 
@@ -190,8 +193,36 @@ public class WeComBotService {
         return new String(b, 0, end, StandardCharsets.UTF_8);
     }
 
-    /** 统一发 POST 并解析 errcode；errcode=0 视为成功 */
+    /** 网络类异常的重试次数：DNS 抖动/连接重置时，一次失败不该让整组截图全丢 */
+    private static final int CALL_RETRIES = 3;
+
+    /**
+     * 带重试的发送入口：只对「网络层」异常重试（域名解析失败、连不上、读超时）；
+     * HTTP 200 + errcode≠0 属于业务失败（key 失效、图片超限等），重试没有意义，直接返回。
+     */
     private String call(String webhook, String json) throws Exception {
+        Exception last = null;
+        for (int attempt = 1; attempt <= CALL_RETRIES; attempt++) {
+            try {
+                return callOnce(webhook, json);
+            } catch (java.net.UnknownHostException | java.net.ConnectException
+                     | java.net.SocketTimeoutException e) {
+                last = e;
+                log.warn("[企微机器人] 第 {}/{} 次发送失败（{} : {}）",
+                        attempt, CALL_RETRIES, e.getClass().getSimpleName(), e.getMessage());
+                if (attempt < CALL_RETRIES) {
+                    sleepQuietly(800L * attempt);   // 0.8s → 1.6s，给 DNS/网络恢复留时间
+                }
+            }
+        }
+        if (last != null) {
+            throw last;
+        }
+        throw new IllegalStateException("企业微信推送失败：重试 " + CALL_RETRIES + " 次仍无结果");
+    }
+
+    /** 单次发送：POST JSON 并解析 errcode；errcode=0 视为成功 */
+    private String callOnce(String webhook, String json) throws Exception {
         HttpURLConnection conn = (HttpURLConnection) new URL(webhook).openConnection();
         try {
             conn.setRequestMethod("POST");
@@ -235,6 +266,25 @@ public class WeComBotService {
         } finally {
             conn.disconnect();
         }
+    }
+
+    /**
+     * 统一失败文案：必须带异常类型（UnknownHostException / SocketTimeoutException…），
+     * 否则只剩一个域名，分不清是 DNS、超时还是 HTTP 业务错误。同时落一条带堆栈的 WARN。
+     */
+    private static String fail(String scene, Exception e) {
+        String msg = (e.getMessage() == null) ? "" : e.getMessage().trim();
+        String type = e.getClass().getSimpleName();
+        String hint = "";
+        if (e instanceof java.net.UnknownHostException) {
+            hint = "（域名解析失败：本机 DNS 不可用或网络刚切换）";
+        } else if (e instanceof java.net.ConnectException) {
+            hint = "（连接被拒绝/不通：检查防火墙与代理）";
+        } else if (e instanceof java.net.SocketTimeoutException) {
+            hint = "（读超时：网络拥塞或图片过大）";
+        }
+        log.warn("[企微机器人] {} 发送异常 {} : {}", scene, type, msg, e);
+        return "发送异常：" + type + (msg.isEmpty() ? "" : " " + msg) + hint;
     }
 
     private static String md5(byte[] data) throws Exception {
