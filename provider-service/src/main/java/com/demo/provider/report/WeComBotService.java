@@ -11,7 +11,9 @@ import java.io.File;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
+import java.net.InetAddress;
 import java.net.URL;
+import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.security.MessageDigest;
@@ -66,6 +68,10 @@ public class WeComBotService {
         }
         String url = webhook.trim();
         StringBuilder sb = new StringBuilder();
+
+        // ⓿ 推送前先等域名可解析：家用宽带从待机唤醒后，头几分钟 DNS 经常抽风；
+        //    此时直接发 → 一次 UnknownHost 就把整组截图判死。等待窗口内恢复即可正常发。
+        waitForDns(url, 90);
 
         // ① 摘要（可选）：必须是 text，markdown 在微信客户端打不开
         if (digest != null && !digest.trim().isEmpty()) {
@@ -211,7 +217,9 @@ public class WeComBotService {
                 log.warn("[企微机器人] 第 {}/{} 次发送失败（{} : {}）",
                         attempt, CALL_RETRIES, e.getClass().getSimpleName(), e.getMessage());
                 if (attempt < CALL_RETRIES) {
-                    sleepQuietly(800L * attempt);   // 0.8s → 1.6s，给 DNS/网络恢复留时间
+                    // ★ 必须 > JDK 的 DNS 负缓存 10 秒（networkaddress.cache.negative.ttl），
+                    //   否则重试会直接命中缓存、瞬间失败，等于没重试（2026-11-06 踩过）
+                    sleepQuietly(12_000L);
                 }
             }
         }
@@ -265,6 +273,44 @@ public class WeComBotService {
             return (errcode == 0) ? "ok" : ("失败 errcode=" + errcode + " " + trim(body, 160));
         } finally {
             conn.disconnect();
+        }
+    }
+
+    /**
+     * 推送前确认域名可解析，最多等 maxWaitSeconds 秒（每 15 秒探一次）。
+     *
+     * 为什么需要：本机 24h 不关机、夜里在 Modern Standby，早上唤醒后 USB 无线网卡 + DNS
+     * 需要一段时间才稳定；定时任务恰好落在这个窗口里时，一次 UnknownHost 就会让整组截图全灭。
+     * 探测成功时正常情况是 0 开销（第一次就返回）。
+     *
+     * 间隔必须 > JDK 负缓存 10 秒：解析失败的结果会被 InetAddress 缓存 10 秒，
+     * 间隔小于 10 秒的重试全部命中缓存，看着"重试了"其实一次 DNS 查询都没发出去。
+     */
+    private boolean waitForDns(String webhook, int maxWaitSeconds) {
+        String host;
+        try {
+            host = new URL(webhook).getHost();
+        } catch (Exception e) {
+            return true;    // URL 本身有问题，交给 call() 报明确错误
+        }
+        long deadline = System.currentTimeMillis() + maxWaitSeconds * 1000L;
+        int attempt = 0;
+        while (true) {
+            attempt++;
+            try {
+                InetAddress.getByName(host);
+                if (attempt > 1) {
+                    log.info("[企微机器人] DNS 已就绪（第 {} 次探测，等了约 {} 秒）", attempt, (attempt - 1) * 15);
+                }
+                return true;
+            } catch (UnknownHostException e) {
+                if (System.currentTimeMillis() >= deadline) {
+                    log.warn("[企微机器人] DNS 等待 {} 秒仍未就绪：{}，仍尝试发送", maxWaitSeconds, host);
+                    return false;
+                }
+                log.warn("[企微机器人] DNS 未就绪（第 {} 次）：{}，15 秒后重试", attempt, host);
+                sleepQuietly(15_000L);
+            }
         }
     }
 
