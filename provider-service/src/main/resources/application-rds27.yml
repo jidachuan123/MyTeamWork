@@ -16,7 +16,7 @@ rds27:
   # ---------- RDS_BC 库（对应 .66 上的 primaryDataSource 用途：商品/用户等业务表，1141 张表）----------
   bc:
     url: "jdbc:sqlserver://192.168.0.27:1543;databaseName=RDS_BC;encrypt=false;trustServerCertificate=true"
-    username: "mis_user"
+    username: "mis_user2"
     password: "Enjoyit.2SqlServer"
     driver-class-name: "com.microsoft.sqlserver.jdbc.SQLServerDriver"
     hikari:
