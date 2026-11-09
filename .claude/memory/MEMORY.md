@@ -11,6 +11,7 @@ MyTeamWork（`C:\work\MyTeamWork`）项目记忆索引。每条一行：`- [标�
 - [curl 必须 --noproxy](feedback-curl-noproxy.md) — 本机有 127.0.0.1:7688 代理，否则 502 假象
 - [记忆库位置](feedback-memory-location.md) — 就是这里，不要再写 `~/.claude/projects/...`
 - [学到新知识先提醒再存](feedback-remind-to-save-memory.md) — 新增/更新/删除记忆都要先提醒，不静默写入也不闷着不改
+- [提交前必须让用户确认](feedback-confirm-before-git-commit.md) — git commit/push 前先列分支+文件清单+message 草稿
 
 ## 报表口径与技术细节（自 CLAUDE.md 下沉）
 - [SD1~SD4 完整口径](reference-sd-calibers.md) — 同比/增长率/分组/库存排除/渠道补差/画布/配置驱动截图

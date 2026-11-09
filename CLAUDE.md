@@ -48,6 +48,8 @@ Spring Cloud（Spring Boot 2.7.18 / Spring Cloud 2021.0.8 / Java 16）后端工�
 
 学到新知识时**先提醒用户确认再写**；读到记忆与当前代码/配置对不上时，**当场指出并提议更新或删除**，不要沿用旧值也不要不吭声地改掉（细则见 `.claude/memory/feedback-remind-to-save-memory.md`）。
 
+**git 提交规则**：执行 `git commit` / `git push` 前必须先给出「当前分支 + `git status --short` 文件清单 + commit message 草稿」并等用户确认；发现明文密钥、误入的构建产物要主动指出。细则见 `.claude/memory/feedback-confirm-before-git-commit.md`。
+
 ## 构建与运行
 
 `mvn` 不在 PATH 上。本机两份安装，均可用：
