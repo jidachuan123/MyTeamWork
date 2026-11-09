@@ -1,0 +1,36 @@
+# ============================================================
+# 192.168.0.27 数据库连接（新备机 / 测试源）独立配置 —— 2026-11-09 新建
+#
+# ★ 与现有的四套数据源完全隔离：
+#     application.yml        → primaryDataSource(192.168.0.66/RDS_BC) + scDataSource(192.168.0.66/RDS_SC)
+#     application-sd3.yml    → sd3DataSource (MySQL bcm)
+#     application-sd4.yml    → sd4DataSource (192.168.0.66/RDS_SC)
+#   本文件只服务 Rds27DataSourceConfig 里的两个新增 Bean，原有配置一行未动。
+#
+# ★ 加载方式：Rds27DataSourceConfig 上用 @PropertySource + YamlPropertySourceFactory 读本文件。
+# ★ 账号：mis_user / Enjoyit.2SqlServer（来源：业务系统相关地址.xlsx 第 1 行 SQLSERVER数据库）
+# ★ 改完重启生效；也可用命令行 --rds27.bc.url=... 临时覆盖。
+# ============================================================
+rds27:
+
+  # ---------- RDS_BC 库（对应 .66 上的 primaryDataSource 用途：商品/用户等业务表，1141 张表）----------
+  bc:
+    url: "jdbc:sqlserver://192.168.0.27:1543;databaseName=RDS_BC;encrypt=false;trustServerCertificate=true"
+    username: "mis_user"
+    password: "Enjoyit.2SqlServer"
+    driver-class-name: "com.microsoft.sqlserver.jdbc.SQLServerDriver"
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 1
+      connection-timeout: 30000
+
+  # ---------- RDS_SC 库（对应 .66 上的 scDataSource 用途：SD1/SD2 取数、盘点报表、dw 预计算宽表，1399 张表）----------
+  sc:
+    url: "jdbc:sqlserver://192.168.0.27:1543;databaseName=RDS_SC;encrypt=false;trustServerCertificate=true"
+    username: "mis_user"
+    password: "Enjoyit.2SqlServer"
+    driver-class-name: "com.microsoft.sqlserver.jdbc.SQLServerDriver"
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 1
+      connection-timeout: 30000
