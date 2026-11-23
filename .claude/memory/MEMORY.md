@@ -16,6 +16,7 @@ MyTeamWork（`C:\work\MyTeamWork`）项目记忆索引。每条一行：`- [标�
 ## 报表口径与技术细节（自 CLAUDE.md 下沉）
 - [SD1~SD4 完整口径](reference-sd-calibers.md) — 同比/增长率/分组/库存排除/渠道补差/画布/配置驱动截图
 - [已知坑与手改速查](reference-pitfalls.md) — 企微 DNS/截图轮询/多语句 SQL/中文 key/编码 + 改配置三铁律
+- [报表平台 SQL 限制](reference-report-platform-sql-limits.md) — Navicat 能跑但平台报 ")" / AND 错的根因：最外层 SELECT 只放取值，计算全进临时表
 - [provider 内部机制](reference-provider-internals.md) — 预计算 dw、统一响应体、定时任务状态、外部 config 生效差异快照
 - [consumer 认证与 SSO](reference-consumer-auth.md) — JWT 拦截链、权限、Feign、门户票据
 
